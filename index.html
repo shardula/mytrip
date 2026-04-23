@@ -265,6 +265,11 @@ input[type="file"]{position:absolute!important;left:-9999px!important;width:1px!
         <input class="link-inp" id="linkInp" type="text" placeholder="Paste URL or file path…" oninput="onLinkType()">
         <span class="link-x" id="linkX" onclick="clearLink()">&#10005;</span>
       </div>
+      <div class="link-box" style="margin-top:10px">
+        <span class="link-pfx">&#128205;</span>
+        <input class="link-inp" id="mapInp" type="text" placeholder="Optional: paste Google Maps link…" oninput="onMapType()">
+        <span class="link-x" id="mapX" onclick="clearMap()">&#10005;</span>
+      </div>
       <div class="or-row"><span>or</span></div>
       <label class="browse-btn" for="fileInput"><span style="font-size:18px">&#128194;</span> Browse files on this device</label>
       <input type="file" id="fileInput" accept="*/*" onchange="onFilePick(event)">
@@ -581,6 +586,15 @@ async function loadBlob(k){
   var db=await openDB();
   return new Promise(function(res){var tx=db.transaction('audio','readonly');var r=tx.objectStore('audio').get(k);r.onsuccess=function(e){res(e.target.result?e.target.result.blob:null);};r.onerror=function(){res(null);};});
 }
+async function deleteAudioBlob(k){
+  var db=await openDB();
+  return new Promise(function(res){
+    var tx=db.transaction('audio','readwrite');
+    tx.objectStore('audio').delete(k);
+    tx.oncomplete=function(){res();};
+    tx.onerror=function(){res();};
+  });
+}
 async function saveFile(k,blob,name,mime){
   var db=await openDB();
   return new Promise(function(res,rej){var tx=db.transaction('files','readwrite');tx.objectStore('files').put({id:k,blob:blob,name:name,mime:mime||'application/octet-stream'});tx.oncomplete=res;tx.onerror=rej;});
@@ -645,14 +659,19 @@ function mkAudioBlock(key){
   return '<div class="audio-player" id="ap'+key+'" style="display:none">'
     +'<button class="play-btn" id="pb'+key+'" onclick="togglePlay(\''+key+'\')">▶</button>'
     +'<div class="prog-col">'
-    +'<div class="audio-lbl" id="albl'+key+'">🎧 Audio guide</div>'
-    +'<div class="prog-track" id="pt'+key+'" onclick="seekAudio(event,\''+key+'\')"><div class="prog-fill" id="pf'+key+'"></div></div>'
-    +'<div class="prog-times"><span id="ct'+key+'">0:00</span><span id="dt'+key+'">—</span></div>'
-    +'</div></div>'
-    +'<div class="attach-strip" id="aus'+key+'">'
+      +'<div class="audio-lbl" id="albl'+key+'">🎧 Audio guide</div>'
+      +'<div class="prog-track" id="pt'+key+'" onclick="seekAudio(event,\''+key+'\')"><div class="prog-fill" id="pf'+key+'"></div></div>'
+      +'<div class="prog-times"><span id="ct'+key+'">0:00</span><span id="dt'+key+'">—</span></div>'
+    +'</div>'
+    +'<div class="fv-controls" style="margin-right:0">'
+      +'<button class="fv-btn" title="Replace audio" onclick="openAudioPicker(\''+key+'\')">🔁</button>'
+      +'<button class="fv-btn" title="Remove audio" onclick="removeAudio(\''+key+'\')">🗑</button>'
+    +'</div>'
+  +'</div>'
+  +'<div class="attach-strip" id="aus'+key+'">'
     +'<label class="attach-chip" for="af'+key+'">🎧 Link audio file</label>'
     +'<input type="file" id="af'+key+'" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg" onchange="handleAudio(event,\''+key+'\')">'
-    +'</div>';
+  +'</div>';
 }
 function mkFileChip(storedKey,fileRef){
   var name=(fileRef||'').split('/').pop()||fileRef||'Open file';
@@ -829,6 +848,7 @@ async function renderDay(n){
           +'</div>'
         +'</div>';
       if(it.note) h+='<div class="card-detail">'+it.note+'</div>';
+      if(it.mapUrl) h+='<div style="margin-top:8px"><a class="map-btn" href="'+it.mapUrl+'" target="_blank">📍 Map</a></div>';
       if(it.type==='audio') h+='<div id="audiowrap'+ak2+'">'+mkAudioBlock(ak2)+'</div>';
       else if(it.storedKey) h+=mkFileChip(it.storedKey,it.fileRef||'');
       else if(it.fileRef) h+=mkLinkChip(it.fileRef);
@@ -910,6 +930,25 @@ async function restoreAudio(k,fallback){
   var meta=S.audioMeta(k)||{name:fallback||'Audio'};
   showPlayer(k,URL.createObjectURL(blob),meta.name);
   markChipFile(k);
+}
+function openAudioPicker(k){
+  try{
+    var inp=document.getElementById('af'+k);
+    if(inp) inp.click();
+  }catch(e){}
+}
+async function removeAudio(k){
+  try{
+    // Stop playback
+    var a=audioEls[k];
+    if(a){ try{a.pause();}catch(e){} a.src=''; }
+    // Remove stored blob + meta
+    await deleteAudioBlob(k);
+    try{ localStorage.removeItem('am'+k); }catch(e){}
+    // Hide player, show upload prompt
+    var ap=document.getElementById('ap'+k); if(ap) ap.style.display='none';
+    var aus=document.getElementById('aus'+k); if(aus) aus.style.display='flex';
+  }catch(e){ console.error(e); }
 }
 function showPlayer(k,url,name){
   var a=document.getElementById('aud'+k);
@@ -1115,7 +1154,7 @@ function openSheet(day){
   var tiles=document.querySelectorAll('.tile');
   for(var i=0;i<tiles.length;i++) tiles[i].classList.toggle('sel',tiles[i].dataset.t==='audio');
   document.getElementById('audioHint').classList.add('show');
-  clearLink(); clearLinked();
+  clearLink(); clearMap(); clearLinked();
   pendingFile=null;
   document.getElementById('noteInp').value='';
   document.getElementById('overlay').classList.add('open');
@@ -1130,6 +1169,8 @@ function selTile(el){
 }
 function clearLink(){document.getElementById('linkInp').value='';document.getElementById('linkX').classList.remove('show');}
 function onLinkType(){document.getElementById('linkX').classList.toggle('show',document.getElementById('linkInp').value.length>0);}
+function clearMap(){document.getElementById('mapInp').value='';document.getElementById('mapX').classList.remove('show');}
+function onMapType(){document.getElementById('mapX').classList.toggle('show',document.getElementById('mapInp').value.length>0);}
 function clearLinked(){document.getElementById('linkedPreview').classList.remove('show');document.getElementById('linkArea').style.display='';pendingFile=null;}
 function onFilePick(evt){
   var f=evt.target.files[0]; if(!f) return;
@@ -1143,6 +1184,7 @@ function onFilePick(evt){
 async function saveItem(){
   var note=document.getElementById('noteInp').value.trim();
   var linkVal=document.getElementById('linkInp').value.trim();
+  var mapUrl=document.getElementById('mapInp').value.trim();
   var xi=S.extra(modalDay).length;
   var fkey='d'+modalDay+'x'+xi;
   var fileRef=linkVal||null;
@@ -1159,7 +1201,7 @@ async function saveItem(){
     }
     storedKey=fkey;
   }
-  S.addExtra(modalDay,{type:selType,name:selType,note:note,fileRef:fileRef,storedKey:storedKey});
+  S.addExtra(modalDay,{type:selType,name:selType,note:note,fileRef:fileRef,storedKey:storedKey,mapUrl:mapUrl||null});
   // Ensure the day has a valid global order and that the new item is included.
   // (iOS PWAs can sometimes create day state before the order list is initialized.)
   try{
