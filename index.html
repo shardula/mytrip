@@ -59,7 +59,13 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .badge.transit{background:rgba(120,120,120,0.1);border:1px solid rgba(120,120,120,0.25);color:var(--muted);}
 .badge.sm{font-size:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);}
 .sec{font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin:14px 16px 8px;display:flex;align-items:center;gap:8px;}
-.sec::after{content:'';flex:1;height:1px;background:var(--border);}
+.sec-label{white-space:nowrap;}
+.sec-line{flex:1;height:1px;background:var(--border);}
+.sec-actions{display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0;}
+.sec-btn{width:28px;height:28px;border-radius:9px;background:rgba(255,255,255,0.06);border:1px solid var(--border2);color:var(--text);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.sec-btn:active{opacity:0.7;}
+.sec-btn.disabled{opacity:0.35;pointer-events:none;}
+
 .cards{padding:0 12px;}
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:13px 14px;margin-bottom:8px;}
 .card.flight{border-color:rgba(108,183,225,0.22);}.card.hotel{border-color:rgba(201,168,76,0.22);}.card.airbnb{border-color:rgba(255,90,95,0.22);}.card.place{border-color:rgba(184,92,56,0.18);}.card.meal{border-color:rgba(76,175,125,0.18);}.card.car{border-color:rgba(180,180,180,0.18);}.card.tip{border-color:var(--border);background:var(--surface);}
@@ -278,6 +284,7 @@ input[type="file"]{position:absolute!important;left:-9999px!important;width:1px!
 </div>
 <div id="audioPool" style="display:none"></div>
 <script>
+
 'use strict';
 /* ═══════════ DATA ═══════════ */
 const DAYS=[
@@ -393,13 +400,38 @@ const S={
   notes:function(d){return S.get('n'+d)||'';},
   setNote:function(d,v){S.set('n'+d,v);},
   extra:function(d){return S.get('x'+d)||[];},
-  addExtra:function(d,i){var a=S.extra(d);a.push(i);S.set('x'+d,a);},
+  addExtra:function(d,i){var a=S.extra(d); if(i && !i._id){ i._id='x'+d+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7); } a.push(i); S.set('x'+d,a);},
   pack:function(){return S.get('pack')||{};},
   togglePack:function(k){var p=S.pack();p[k]=!p[k];S.set('pack',p);return p[k];},
   audioMeta:function(k){return S.get('am'+k);},
   setAudioMeta:function(k,m){S.set('am'+k,m);}
+  ,secOrder:function(d){return S.get('so'+d)||null;}
+  ,setSecOrder:function(d,arr){S.set('so'+d,arr);}
 };
 
+
+// Section ordering (lets you move Flights/Hotels/Attractions/Food/Added relative to each other)
+function getSecOrder(day){
+  var o=S.secOrder(day);
+  if(o && Array.isArray(o)) return o;
+  return ['flights','stays','places','meals','extra'];
+}
+function setSecOrder(day,o){
+  if(!o || !Array.isArray(o)) return;
+  S.setSecOrder(day,o);
+}
+function moveSection(day,sec,dir){
+  try{
+    var o=getSecOrder(day).slice();
+    var i=o.indexOf(sec);
+    if(i<0) return;
+    var j=i+dir;
+    if(j<0||j>=o.length) return;
+    var tmp=o[i]; o[i]=o[j]; o[j]=tmp;
+    setSecOrder(day,o);
+    renderDay(day);
+  }catch(e){console.error(e);}
+}
 // Manage user-added items (reorder + delete)
 function deleteExtra(day,idx){
   try{
@@ -422,6 +454,111 @@ function moveExtra(day,idx,dir){
     renderDay(day);
   }catch(e){console.error(e);}
 }
+
+
+
+// Global ordering across ALL items (flights/stays/places/meals/added)
+function orderKey(day){ return 'ord'+day; }
+function makeItemKey(sec,item){ return sec+':' + (item && item._id ? item._id : ''); }
+function buildItemMap(dayObj, secOrder, lists){
+  var map = {};
+  for(var si=0; si<secOrder.length; si++){
+    var sec=secOrder[si];
+    var arr=lists[sec]||[];
+    for(var i=0;i<arr.length;i++){
+      var it=arr[i];
+      if(sec==='extra' && it && !it._id){ it._id='x'+dayObj.day+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7); }
+      var k=makeItemKey(sec,it);
+      map[k]={sec:sec, item:it};
+    }
+  }
+  return map;
+}
+function defaultOrder(dayObj, secOrder, lists){
+  var o=[];
+  for(var si=0; si<secOrder.length; si++){
+    var sec=secOrder[si];
+    var arr=lists[sec]||[];
+    for(var i=0;i<arr.length;i++){
+      var it=arr[i];
+      if(sec==='extra' && it && !it._id){ it._id='x'+dayObj.day+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7); }
+      o.push(makeItemKey(sec,it));
+    }
+  }
+  return o;
+}
+function getGlobalOrder(dayObj, secOrder, lists){
+  var stored=S.get(orderKey(dayObj.day));
+  var map=buildItemMap(dayObj, secOrder, lists);
+  var o;
+  if(!stored || !Array.isArray(stored) || !stored.length){
+    o=defaultOrder(dayObj, secOrder, lists);
+    S.set(orderKey(dayObj.day), o);
+    return o;
+  }
+  // keep only existing keys
+  o=[];
+  var seen={};
+  for(var i=0;i<stored.length;i++){
+    var k=stored[i];
+    if(map[k]){ o.push(k); seen[k]=1; }
+  }
+  // append new keys
+  var def=defaultOrder(dayObj, secOrder, lists);
+  for(var j=0;j<def.length;j++){
+    var k2=def[j];
+    if(!seen[k2] && map[k2]){ o.push(k2); seen[k2]=1; }
+  }
+  S.set(orderKey(dayObj.day), o);
+  return o;
+}
+function moveGlobal(day, key, dir){
+  var o=S.get(orderKey(day))||[];
+  var i=o.indexOf(key);
+  if(i<0) return;
+  var j=i+dir;
+  if(j<0||j>=o.length) return;
+  var tmp=o[i]; o[i]=o[j]; o[j]=tmp;
+  S.set(orderKey(day), o);
+  renderDay(day);
+}
+
+function moveGlobalIdx(day, idx, dir){
+  var o=S.get(orderKey(day))||[];
+  if(idx<0||idx>=o.length) return;
+  var j=idx+dir;
+  if(j<0||j>=o.length) return;
+  var tmp=o[idx]; o[idx]=o[j]; o[j]=tmp;
+  S.set(orderKey(day), o);
+  renderDay(day);
+}
+function deleteGlobalIdx(day, idx){
+  var o=S.get(orderKey(day))||[];
+  if(idx<0||idx>=o.length) return;
+  deleteGlobal(day, o[idx]);
+}
+function deleteGlobal(day, key){
+  if(!confirm('Delete this item?')) return;
+  var parts=key.split(':');
+  var sec=parts[0];
+  var id=parts.slice(1).join(':');
+  var d=DAYS.find(function(x){return x.day===day;});
+  if(!d) return;
+  if(sec==='extra'){
+    var a=S.extra(day);
+    var idx=a.findIndex(function(x){return x && x._id===id;});
+    if(idx>=0){ a.splice(idx,1); S.set('x'+day,a); }
+  } else {
+    var arr=ensureOverride(d,sec);
+    var idx=arr.findIndex(function(x){return x && x._id===id;});
+    if(idx>=0){ arr.splice(idx,1); S.set(ovKey(day,sec), arr); }
+  }
+  var o=S.get(orderKey(day))||[];
+  o=o.filter(function(k){return k!==key;});
+  S.set(orderKey(day), o);
+  renderDay(day);
+}
+
 
 /* ═══════════ INDEXEDDB ═══════════ */
 function openDB(){
@@ -539,9 +676,18 @@ async function renderDay(n){
   if(!d) return;
   var extra=S.extra(n), notes=S.notes(n);
   var titleWords=d.title.split(' '), lastWord=titleWords.pop();
-  var h='';
+
+  // SECTION DATA
+  var flights=getSectionList(d,'flights')||[];
+  var stays=getSectionList(d,'stays')||[];
+  var places=getSectionList(d,'places')||[];
+  var meals=getSectionList(d,'meals')||[];
+
+  // SECTION ORDER (user-customizable)
+  var secOrder=getSecOrder(n);
 
   // HERO
+  var h='';
   h+='<div class="hero">';
   h+='<div class="hero-glow '+d.country+'"></div>';
   h+='<div class="eyebrow">Day '+d.day+' of 17 · '+d.date+'</div>';
@@ -551,193 +697,185 @@ async function renderDay(n){
   if(d.transport) h+='<span class="badge sm">🚗 '+d.transport+'</span>';
   h+='</div></div>';
 
-  // FLIGHTS
-  var flights=getSectionList(d,'flights');
-  if(flights&&flights.length){
-    h+='<div class="sec">✈️ Flights</div><div class="cards">';
-    for(var fi=0;fi<flights.length;fi++){
-      var f=flights[fi];
+  function secHdr(label, key){
+    var idx=secOrder.indexOf(key);
+    var upCls = (idx<=0)?'sec-btn disabled':'sec-btn';
+    var dnCls = (idx<0||idx>=secOrder.length-1)?'sec-btn disabled':'sec-btn';
+    return '<div class="sec"><span class="sec-label">'+label+'</span><span class="sec-line"></span>'
+      +'<span class="sec-actions">'
+        +'<button class="'+upCls+'" title="Move section up" onclick="moveSection('+n+',\''+key+'\',-1)">↑</button>'
+        +'<button class="'+dnCls+'" title="Move section down" onclick="moveSection('+n+',\''+key+'\',1)">↓</button>'
+      +'</span></div>';
+  }
+
+  // Build GLOBAL ordered list so you can reorder across types (Flights vs Added, etc.)
+  var lists={flights:flights,stays:stays,places:places,meals:meals,extra:extra};
+  var order=getGlobalOrder(d, secOrder, lists);
+  var map=buildItemMap(d, secOrder, lists);
+  function idxById(arr,id){
+    for(var i=0;i<arr.length;i++){ if(arr[i] && arr[i]._id===id) return i; }
+    return -1;
+  }
+  h+='<div class="sec"><span class="sec-label">🗂 Items</span><span class="sec-line"></span></div>';
+  h+='<div class="cards">';
+
+  for(var oi=0; oi<order.length; oi++){
+    var key=order[oi];
+    var rec=map[key];
+    if(!rec) continue;
+    var sec=rec.sec;
+    var it=rec.item||{};
+    var upCls=(oi===0)?'mini-btn disabled':'mini-btn';
+    var dnCls=(oi===order.length-1)?'mini-btn disabled':'mini-btn';
+
+    if(sec==='flights'){
+      var fid=key.split(':').slice(1).join(':');
+      var fi=idxById(flights,fid);
       h+='<div class="card flight">';
-      var upClsF=(fi===0)?'mini-btn disabled':'mini-btn';
-      var dnClsF=(fi===flights.length-1)?'mini-btn disabled':'mini-btn';
-      h+='<div class="card-row"><div class="card-sub">'+f.airline+(f.flightNo?' · '+f.flightNo:'')+'</div>';
+      h+='<div class="card-row"><div class="card-sub">'+(it.airline||'Flight')+(it.flightNo?' · '+it.flightNo:'')+'</div>';
       h+='<div class="mini-actions">'
-          +'<button class="'+upClsF+'" title="Move up" onclick="moveBase('+n+',\'flights\','+fi+',-1)">↑</button>'
-          +'<button class="'+dnClsF+'" title="Move down" onclick="moveBase('+n+',\'flights\','+fi+',1)">↓</button>'
-          +'<button class="mini-btn" title="Edit" onclick="editBase('+n+',\'flights\','+fi+')">✎</button>'
-          +'<button class="mini-btn danger" title="Delete" onclick="deleteBase('+n+',\'flights\','+fi+')">🗑</button>'
+          +'<button class="'+upCls+'" title="Move up" onclick="moveGlobalIdx('+n+','+oi+',-1)">↑</button>'
+          +'<button class="'+dnCls+'" title="Move down" onclick="moveGlobalIdx('+n+','+oi+',1)">↓</button>'
+                    +'<button class="mini-btn danger" title="Delete" onclick="deleteGlobalIdx('+n+','+oi+')">🗑</button>'
         +'</div>';
-      if(f.price) h+='<span style="font-size:11px;color:var(--muted)">'+f.price+'</span>';
+      if(it.price) h+='<span style="font-size:11px;color:var(--muted)">'+it.price+'</span>';
       h+='</div>';
-      h+='<div class="f-route"><div class="f-city"><div class="f-code">'+f.from+'</div><div class="f-name">'+f.fromCity+'</div></div>';
+      h+='<div class="f-route"><div class="f-city"><div class="f-code">'+(it.from||'')+'</div><div class="f-name">'+(it.fromCity||'')+'</div></div>';
       h+='<div class="f-line"><div class="f-plane">✈</div></div>';
-      h+='<div class="f-city"><div class="f-code">'+f.to+'</div><div class="f-name">'+f.toCity+'</div></div></div>';
-      h+='<div class="f-meta"><span>🛫 '+f.departs+'</span><span>⏱ '+f.duration+'</span><span>🛬 '+f.arrives+'</span></div>';
-      if(f.terminal) h+='<div class="card-detail" style="margin-top:6px">🏢 '+f.terminal+'</div>';
-      if(f.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+f.userNote+'</div>';
-      h+=mkBkRow(f.ref,f.mapQ||null);
+      h+='<div class="f-city"><div class="f-code">'+(it.to||'')+'</div><div class="f-name">'+(it.toCity||'')+'</div></div></div>';
+      h+='<div class="f-meta"><span>🛫 '+(it.departs||'')+'</span><span>⏱ '+(it.duration||'')+'</span><span>🛬 '+(it.arrives||'')+'</span></div>';
+      if(it.terminal) h+='<div class="card-detail" style="margin-top:6px">🏢 '+it.terminal+'</div>';
+      if(it.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+it.userNote+'</div>';
+      h+=mkBkRow(it.ref,it.mapQ||null);
       h+='</div>';
+      continue;
     }
-    h+='</div>';
-  }
 
-  // STAYS
-  var stays=getSectionList(d,'stays');
-  if(stays&&stays.length){
-    h+='<div class="sec">🏨 Accommodation</div><div class="cards">';
-    for(var si=0;si<stays.length;si++){
-      var s=stays[si];
-      var sIcon={hotel:'🏨',airbnb:'🏠',car:'🚗',cab:'🚕'}[s.type]||'🏨';
-      var sClass={hotel:'hotel',airbnb:'airbnb',car:'car',cab:'car'}[s.type]||'hotel';
+    if(sec==='stays'){
+      var sid=key.split(':').slice(1).join(':');
+      var si=idxById(stays,sid);
+      var sIcon={hotel:'🏨',airbnb:'🏠',car:'🚗',cab:'🚕'}[it.type]||'🏨';
+      var sClass={hotel:'hotel',airbnb:'airbnb',car:'car',cab:'car'}[it.type]||'hotel';
       h+='<div class="card '+sClass+'">';
-      var upClsS=(si===0)?'mini-btn disabled':'mini-btn';
-      var dnClsS=(si===stays.length-1)?'mini-btn disabled':'mini-btn';
-      h+='<div class="card-row"><span style="font-size:14px">'+sIcon+'</span><span class="card-title" style="flex:1;margin-left:6px">'+s.name+'</span>';
+      h+='<div class="card-row"><span style="font-size:14px">'+sIcon+'</span><span class="card-title" style="flex:1;margin-left:6px">'+(it.name||'Stay')+'</span>';
       h+='<div class="mini-actions">'
-          +'<button class="'+upClsS+'" title="Move up" onclick="moveBase('+n+',\'stays\','+si+',-1)">↑</button>'
-          +'<button class="'+dnClsS+'" title="Move down" onclick="moveBase('+n+',\'stays\','+si+',1)">↓</button>'
-          +'<button class="mini-btn" title="Edit" onclick="editBase('+n+',\'stays\','+si+')">✎</button>'
-          +'<button class="mini-btn danger" title="Delete" onclick="deleteBase('+n+',\'stays\','+si+')">🗑</button>'
+          +'<button class="'+upCls+'" title="Move up" onclick="moveGlobalIdx('+n+','+oi+',-1)">↑</button>'
+          +'<button class="'+dnCls+'" title="Move down" onclick="moveGlobalIdx('+n+','+oi+',1)">↓</button>'
+                    +'<button class="mini-btn danger" title="Delete" onclick="deleteGlobalIdx('+n+','+oi+')">🗑</button>'
         +'</div>';
-      if(s.price&&s.price!=='Free') h+='<span style="font-size:11px;color:var(--muted)">'+s.price+'</span>';
+      if(it.price&&it.price!=='Free') h+='<span style="font-size:11px;color:var(--muted)">'+it.price+'</span>';
       h+='</div>';
-      if(s.address) h+='<div class="addr-row"><span class="addr-icon">📍</span><span class="addr-text">'+s.address+'</span></div>';
-      h+=mkCiRow(s.checkIn,s.checkOut);
-      h+=mkBkRow(s.ref,s.mapQ||null);
-      if(s.note) h+='<div class="card-detail">'+s.note+'</div>';
-      if(s.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+s.userNote+'</div>';
+      if(it.address) h+='<div class="addr-row"><span class="addr-icon">📍</span><span class="addr-text">'+it.address+'</span></div>';
+      h+=mkCiRow(it.checkIn,it.checkOut);
+      h+=mkBkRow(it.ref,it.mapQ||null);
+      if(it.note) h+='<div class="card-detail">'+it.note+'</div>';
+      if(it.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+it.userNote+'</div>';
       h+='</div>';
+      continue;
     }
-    h+='</div>';
-  }
 
-  // PLACES
-  var places=getSectionList(d,'places');
-  if(places&&places.length){
-    h+='<div class="sec">📍 Attractions</div>';
-    for(var pi=0;pi<places.length;pi++){
-      var p=places[pi];
-      var pid=(p._id||('p'+n+'_'+pi));
-      var ak='d'+n+'_'+pid;
-      h+='<div class="cards"><div class="card place">';
-      var upClsP=(pi===0)?'mini-btn disabled':'mini-btn';
-      var dnClsP=(pi===places.length-1)?'mini-btn disabled':'mini-btn';
-      h+='<div class="card-row">'
-        +'<div class="card-title" style="margin:0;flex:1">'+p.name+'</div>'
-        +'<div class="mini-actions">'
-          +'<button class="'+upClsP+'" title="Move up" onclick="moveBase('+n+',\'places\','+pi+',-1)">↑</button>'
-          +'<button class="'+dnClsP+'" title="Move down" onclick="moveBase('+n+',\'places\','+pi+',1)">↓</button>'
-          +'<button class="mini-btn" title="Edit" onclick="editBase('+n+',\'places\','+pi+')">✎</button>'
-          +'<button class="mini-btn danger" title="Delete" onclick="deleteBase('+n+',\'places\','+pi+')">🗑</button>'
-        +'</div>'
-      +'</div>';
-      if(p.time) h+='<div class="card-sub">'+p.time+'</div>';
-      h+='<div class="card-detail">💡 '+p.tips+'</div>';
-      if(p.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+p.userNote+'</div>';
-      if(p.ref) h+=mkBkRow(p.ref,p.mapQ||null);
-      if(p.gps) h+='<div style="margin-top:6px;font-size:10px;color:var(--green)">📡 GPS audio trigger active</div>';
-      h+='<div id="audiowrap'+ak+'">'+mkAudioBlock(ak)+'</div>';
-      h+='</div></div>';
-    }
-  }
-
-  // MEALS
-  var meals=getSectionList(d,'meals');
-  if(meals&&meals.length){
-    h+='<div class="sec">🍽 Food &amp; Drink</div><div class="cards">';
-    for(var mi=0;mi<meals.length;mi++){
-      var m=meals[mi];
-      var upClsM=(mi===0)?'mini-btn disabled':'mini-btn';
-      var dnClsM=(mi===meals.length-1)?'mini-btn disabled':'mini-btn';
-      h+='<div class="card meal">'
+    if(sec==='places'){
+      var pid=key.split(':').slice(1).join(':');
+      var pi=idxById(places,pid);
+      var ak='d'+n+'_'+(it._id||pid);
+      h+='<div class="card place">'
         +'<div class="card-row">'
-          +'<div class="card-title" style="margin:0;flex:1">'+m.name+'</div>'
+          +'<div class="card-title" style="margin:0;flex:1">'+(it.name||'Place')+'</div>'
           +'<div class="mini-actions">'
-            +'<button class="'+upClsM+'" title="Move up" onclick="moveBase('+n+',\'meals\','+mi+',-1)">↑</button>'
-            +'<button class="'+dnClsM+'" title="Move down" onclick="moveBase('+n+',\'meals\','+mi+',1)">↓</button>'
-            +'<button class="mini-btn" title="Edit" onclick="editBase('+n+',\'meals\','+mi+')">✎</button>'
-            +'<button class="mini-btn danger" title="Delete" onclick="deleteBase('+n+',\'meals\','+mi+')">🗑</button>'
+            +'<button class="'+upCls+'" title="Move up" onclick="moveGlobalIdx('+n+','+oi+',-1)">↑</button>'
+            +'<button class="'+dnCls+'" title="Move down" onclick="moveGlobalIdx('+n+','+oi+',1)">↓</button>'
+                        +'<button class="mini-btn danger" title="Delete" onclick="deleteGlobalIdx('+n+','+oi+')">🗑</button>'
           +'</div>'
         +'</div>';
-      if(m.note) h+='<div class="card-detail">'+m.note+'</div>';
-      if(m.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+m.userNote+'</div>';
+      if(it.time) h+='<div class="card-sub">'+it.time+'</div>';
+      if(it.tips) h+='<div class="card-detail">💡 '+it.tips+'</div>';
+      if(it.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+it.userNote+'</div>';
+      if(it.ref) h+=mkBkRow(it.ref,it.mapQ||null);
+      if(it.gps) h+='<div style="margin-top:6px;font-size:10px;color:var(--green)">📡 GPS audio trigger active</div>';
+      h+='<div id="audiowrap'+ak+'">'+mkAudioBlock(ak)+'</div>';
       h+='</div>';
+      continue;
     }
-    h+='</div>';
+
+    if(sec==='meals'){
+      var mid=key.split(':').slice(1).join(':');
+      var mi=idxById(meals,mid);
+      h+='<div class="card meal">'
+        +'<div class="card-row">'
+          +'<div class="card-title" style="margin:0;flex:1">'+(it.name||'Meal')+'</div>'
+          +'<div class="mini-actions">'
+            +'<button class="'+upCls+'" title="Move up" onclick="moveGlobalIdx('+n+','+oi+',-1)">↑</button>'
+            +'<button class="'+dnCls+'" title="Move down" onclick="moveGlobalIdx('+n+','+oi+',1)">↓</button>'
+                        +'<button class="mini-btn danger" title="Delete" onclick="deleteGlobalIdx('+n+','+oi+')">🗑</button>'
+          +'</div>'
+        +'</div>';
+      if(it.note) h+='<div class="card-detail">'+it.note+'</div>';
+      if(it.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+it.userNote+'</div>';
+      h+='</div>';
+      continue;
+    }
+
+    if(sec==='extra'){
+      var typeIcons={audio:'🎧',flight:'✈️',hotel:'🏨',airbnb:'🏠',car:'🚗',cab:'🚕',attraction:'📍',restaurant:'🍽',other:'📎'};
+      var ak2='d'+n+'x'+(it._id||oi);
+      var xIcon=typeIcons[it.type]||'📌';
+      h+='<div class="card place" style="border-color:var(--gold-border)">'
+        +'<div class="card-row">'
+          +'<div class="card-title" style="margin:0;flex:1">'+xIcon+' '+(it.name||it.type||'Item')+'</div>'
+          +'<div class="mini-actions">'
+            +'<button class="'+upCls+'" title="Move up" onclick="moveGlobalIdx('+n+','+oi+',-1)">↑</button>'
+            +'<button class="'+dnCls+'" title="Move down" onclick="moveGlobalIdx('+n+','+oi+',1)">↓</button>'
+            +'<button class="mini-btn danger" title="Delete" onclick="deleteGlobalIdx('+n+','+oi+')">🗑</button>'
+          +'</div>'
+        +'</div>';
+      if(it.note) h+='<div class="card-detail">'+it.note+'</div>';
+      if(it.type==='audio') h+='<div id="audiowrap'+ak2+'">'+mkAudioBlock(ak2)+'</div>';
+      else if(it.storedKey) h+=mkFileChip(it.storedKey,it.fileRef||'');
+      else if(it.fileRef) h+=mkLinkChip(it.fileRef);
+      h+='</div>';
+      continue;
+    }
   }
 
-  // EXTRA (user-added)
-  if(extra&&extra.length){
-    var typeIcons={audio:'🎧',flight:'✈️',hotel:'🏨',airbnb:'🏠',car:'🚗',cab:'🚕',attraction:'📍',restaurant:'🍽',other:'📎'};
-    h+='<div class="sec">⭐ Added</div><div class="cards">';
-    for(var xi=0;xi<extra.length;xi++){
-      var item=extra[xi];
-      var ak2='d'+n+'x'+xi;
-      var xIcon=typeIcons[item.type]||'📌';
-      h+='<div class="card place" style="border-color:var(--gold-border)">';
-      var upCls = (xi===0)?'mini-btn disabled':'mini-btn';
-      var dnCls = (xi===extra.length-1)?'mini-btn disabled':'mini-btn';
-      h+='<div class="card-row">'
-        +'<div class="card-title" style="margin:0;flex:1">'+xIcon+' '+(item.name||item.type||'Item')+'</div>'
-        +'<div class="mini-actions">'
-          +'<button class="'+upCls+'" title="Move up" onclick="moveExtra('+n+','+xi+',-1)">↑</button>'
-          +'<button class="'+dnCls+'" title="Move down" onclick="moveExtra('+n+','+xi+',1)">↓</button>'
-          +'<button class="mini-btn danger" title="Delete" onclick="deleteExtra('+n+','+xi+')">🗑</button>'
-        +'</div>'
-      +'</div>';
-      if(item.note) h+='<div class="card-detail">'+item.note+'</div>';
-      if(item.type==='audio'){
-        h+='<div id="audiowrap'+ak2+'">'+mkAudioBlock(ak2)+'</div>';
-      } else if(item.storedKey){
-        h+=mkFileChip(item.storedKey,item.fileRef||'');
-      } else if(item.fileRef){
-        h+=mkLinkChip(item.fileRef);
-      }
-      h+='</div>';
-    }
-    h+='</div>';
-  }
+  h+='</div>';
 
   // DAY TIPS
   if(d.tips){
-    h+='<div class="sec">💡 Day Tips</div><div class="cards"><div class="card tip"><div class="card-detail">'+d.tips+'</div></div></div>';
+    h+='<div class="sec"><span class="sec-label">💡 Day Tips</span><span class="sec-line"></span></div><div class="cards"><div class="card tip"><div class="card-detail">'+d.tips+'</div></div></div>';
   }
 
   // NOTES
-  h+='<div class="sec">📝 My Notes</div>';
-  h+='<div class="cards"><div class="card tip">';
-  h+='<textarea class="notes-area" id="na'+n+'" placeholder="Add thoughts, reminders…" oninput="S.setNote('+n+',this.value)">'+notes+'</textarea>';
-  h+='</div></div>';
+  h+='<div class="sec"><span class="sec-label">📝 My Notes</span><span class="sec-line"></span></div>';
+  h+='<div class="cards"><div class="card tip">'
+    +'<textarea class="notes-area" id="na'+n+'" placeholder="Add thoughts, reminders…" oninput="S.setNote('+n+',this.value)">'+notes+'</textarea>'
+    +'</div></div>';
 
   // ADD BUTTON
-  h+='<div class="cards" style="margin-top:4px"><div class="card add-btn" onclick="openSheet('+n+')">';
-  h+='<div style="font-size:22px;margin-bottom:3px">＋</div>';
-  h+='<div style="font-size:12px;font-weight:500">Add flight, place, audio, file…</div>';
-  h+='</div></div>';
+  h+='<div class="cards" style="margin-top:4px"><div class="card add-btn" onclick="openSheet('+n+')">'
+    +'<div style="font-size:22px;margin-bottom:3px">＋</div>'
+    +'<div style="font-size:12px;font-weight:500">Add flight, place, audio, file…</div>'
+    +'</div></div>';
 
   var view=document.getElementById('viewDay');
   view.innerHTML=h;
   view.classList.add('fade');
   setTimeout(function(){view.classList.remove('fade');},400);
 
-  // Restore audio for base places (use stable ids)
+  // Restore audio for base places
   for(var rpi=0;rpi<(places||[]).length;rpi++){
     var rp=places[rpi];
     var rpid=(rp._id||('p'+n+'_'+rpi));
     await restoreAudio('d'+n+'_'+rpid, rp.name);
   }
   // Restore audio/mark files for extra items
-  for(var rxi=0;rxi<extra.length;rxi++){
+  for(var rxi=0;rxi<(extra||[]).length;rxi++){
     var ritem=extra[rxi];
-    if(ritem.type==='audio'){
-      await restoreAudio('d'+n+'x'+rxi, ritem.name||'Audio');
-    } else if(ritem.storedKey){
-      markChipFile(ritem.storedKey);
-    }
+    if(ritem.type==='audio') await restoreAudio('d'+n+'x'+rxi, ritem.name||'Audio');
+    else if(ritem.storedKey) markChipFile(ritem.storedKey);
   }
 }
 
-/* ═══════════ AUDIO ═══════════ */
+/* ═══════════ AUDIO ═══════════ *//* ═══════════ AUDIO ═══════════ */
 async function handleAudio(evt,k){
   var f=evt.target.files[0];
   if(!f) return;
@@ -1002,6 +1140,16 @@ async function saveItem(){
     storedKey=fkey;
   }
   S.addExtra(modalDay,{type:selType,name:selType,note:note,fileRef:fileRef,storedKey:storedKey});
+  // Append new item into global order so it can be moved anywhere
+  try{
+    var a=S.extra(modalDay)||[];
+    var last=a[a.length-1];
+    if(last && last._id){
+      var ok=orderKey(modalDay);
+      var o=S.get(ok);
+      if(o && Array.isArray(o)){ o.push('extra:'+last._id); S.set(ok,o); }
+    }
+  }catch(e){}
   closeSheet();
   await renderDay(modalDay);
 }
@@ -1060,7 +1208,7 @@ function togglePackRow(row,key){
 /* ═══════════ INFO ═══════════ */
 function buildInfo(){
   document.getElementById('viewInfo').innerHTML='<div class="info-wrap"><div class="info-title">Trip <em>Essentials</em></div></div>'
-  +'<div class="sec" style="margin-top:14px">All Bookings</div>'
+  +'<div class="sec" style="margin-top:14px"><span class="sec-label">All Bookings</span><span class="sec-line"></span></div>'
   +'<div style="padding:0 12px">'
   +'<div class="info-block"><div class="info-block-title">✈️ Flights</div><div class="info-block-body">'
   +'<strong>May 1</strong> Toronto→Athens: AC896 · <strong>BLM969</strong> · Dep 18:35 T1 Pearson<br>'
@@ -1133,6 +1281,7 @@ function goToday(){
 }
 
 init();
+
 </script>
 
 <div class="fv-overlay" id="fvOverlay">
