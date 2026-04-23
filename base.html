@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MyTrip">
+<meta name="theme-color" content="#0e1117">
+<title>Greece &amp; Egypt 2026</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e1117;--bg2:#151820;--bg3:#1c2030;--surface:rgba(255,255,255,0.04);--border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);--text:#e8e2d4;--muted:#7a7264;--gold:#c9a84c;--gold-dim:rgba(201,168,76,0.15);--gold-border:rgba(201,168,76,0.35);--aegean:#2a6596;--aegean-dim:rgba(42,101,150,0.18);--terra:#b85c38;--green:#4caf7d;--red:#e05252;--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;max-width:430px;margin:0 auto;-webkit-font-smoothing:antialiased;}
+.hdr{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:calc(var(--safe-t) + 10px) 16px 10px;border-bottom:1px solid var(--border);background:var(--bg);z-index:50;}
+.hdr-title{font-family:'Playfair Display',serif;font-size:19px;color:var(--gold);}
+.hdr-sub{font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-top:2px;}
+.hdr-actions{display:flex;gap:7px;align-items:center;}
+.gps-pill{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface);font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;}
+.gps-pill.on{border-color:var(--green);color:var(--green);background:rgba(76,175,125,0.1);}
+.gps-pill.err{border-color:var(--red);color:var(--red);}
+.gps-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.gps-pill.on .gps-dot{animation:blink 1.4s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.today-btn{padding:5px 11px;border-radius:20px;border:1px solid var(--gold-border);background:var(--gold-dim);color:var(--gold);font-family:'Outfit',sans-serif;font-size:11px;font-weight:500;cursor:pointer;}
+.strip-wrap{flex-shrink:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:8px 0;}
+.strip{display:flex;gap:6px;padding:0 14px;overflow-x:auto;scrollbar-width:none;}
+.strip::-webkit-scrollbar{display:none;}
+.chip{flex-shrink:0;width:46px;border-radius:11px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 4px;cursor:pointer;border:1px solid var(--border);background:rgba(255,255,255,0.02);position:relative;transition:all 0.15s;}
+.chip.gr{border-color:rgba(42,101,150,0.4);}.chip.eg{border-color:rgba(201,168,76,0.4);}.chip.tr{border-color:rgba(255,255,255,0.11);}
+.chip.active{background:var(--gold);border-color:var(--gold);}
+.chip.active .cn{color:#0e1117;}.chip.active .cf{opacity:1;}
+.cn{font-family:'Playfair Display',serif;font-size:17px;color:var(--text);line-height:1;}
+.cf{font-size:11px;margin-top:2px;opacity:0.75;}
+.chip-dot{position:absolute;bottom:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--green);display:none;}
+.chip.has-file .chip-dot{display:block;}
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--safe-b) + 72px);}
+.view{display:none;}.view.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.fade{animation:fadeUp 0.25s ease;}
+.hero{padding:18px 16px 14px;position:relative;overflow:hidden;}
+.hero-glow{position:absolute;inset:0;pointer-events:none;opacity:0;}
+.hero-glow.greece{background:radial-gradient(ellipse at top right,#2a6596 0%,transparent 65%);opacity:0.22;}
+.hero-glow.egypt{background:radial-gradient(ellipse at top right,#c9a84c 0%,transparent 65%);opacity:0.18;}
+.hero-glow.transit{background:radial-gradient(ellipse at top right,#555 0%,transparent 65%);opacity:0.13;}
+.eyebrow{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;}
+.hero-title{font-family:'Playfair Display',serif;font-size:25px;font-weight:400;line-height:1.15;margin-bottom:3px;}
+.hero-title em{font-style:italic;color:var(--gold);}
+.hero-sub{font-size:12px;color:var(--muted);margin-bottom:11px;}
+.badges{display:flex;gap:6px;flex-wrap:wrap;}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;}
+.badge.greece{background:var(--aegean-dim);border:1px solid rgba(42,101,150,0.4);color:#6db3e8;}
+.badge.egypt{background:var(--gold-dim);border:1px solid var(--gold-border);color:var(--gold);}
+.badge.transit{background:rgba(120,120,120,0.1);border:1px solid rgba(120,120,120,0.25);color:var(--muted);}
+.badge.sm{font-size:10px;background:var(--surface);border:1px solid var(--border);color:var(--muted);}
+.sec{font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);margin:14px 16px 8px;display:flex;align-items:center;gap:8px;}
+.sec::after{content:'';flex:1;height:1px;background:var(--border);}
+.cards{padding:0 12px;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:13px 14px;margin-bottom:8px;}
+.card.flight{border-color:rgba(108,183,225,0.22);}.card.hotel{border-color:rgba(201,168,76,0.22);}.card.airbnb{border-color:rgba(255,90,95,0.22);}.card.place{border-color:rgba(184,92,56,0.18);}.card.meal{border-color:rgba(76,175,125,0.18);}.card.car{border-color:rgba(180,180,180,0.18);}.card.tip{border-color:var(--border);background:var(--surface);}
+.card.add-btn{border-style:dashed;background:transparent;cursor:pointer;text-align:center;color:var(--muted);}
+.card.add-btn:active{background:var(--surface);}
+.card-title{font-family:'Playfair Display',serif;font-size:15px;margin-bottom:2px;line-height:1.25;}
+.card-sub{font-size:12px;color:var(--muted);line-height:1.5;}
+.card-detail{font-size:12.5px;color:rgba(232,226,212,0.82);margin-top:6px;line-height:1.6;}
+.card-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.bk-row{display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.ref-lbl{font-size:10px;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;}
+.ref-code{font-size:13px;font-weight:600;color:var(--gold);letter-spacing:0.04em;margin-left:5px;}
+.map-btn{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#6db3e8;text-decoration:none;padding:4px 9px;border-radius:8px;border:1px solid rgba(42,101,150,0.3);background:rgba(42,101,150,0.1);}
+.map-btn:active{opacity:0.7;}
+.ci-row{display:flex;gap:8px;margin-top:8px;}
+.ci-box{flex:1;background:var(--bg3);border-radius:9px;padding:7px 10px;border:1px solid var(--border);}
+.ci-lbl{font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:2px;}
+.ci-val{font-size:13px;font-weight:500;color:var(--text);}
+.addr-row{display:flex;align-items:flex-start;gap:6px;margin-top:7px;}
+.addr-icon{font-size:13px;flex-shrink:0;margin-top:1px;}
+.addr-text{font-size:12px;color:var(--muted);line-height:1.45;flex:1;}
+.f-route{display:flex;align-items:center;gap:8px;margin:8px 0 5px;}
+.f-city{text-align:center;}
+.f-code{font-family:'Playfair Display',serif;font-size:21px;color:var(--gold);line-height:1;}
+.f-name{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-top:1px;}
+.f-line{flex:1;display:flex;align-items:center;gap:3px;}
+.f-line::before,.f-line::after{content:'';flex:1;height:1px;background:var(--border2);}
+.f-plane{font-size:14px;color:var(--muted);}
+.f-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);}
+.attach-strip{display:flex;align-items:center;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap;}
+.attach-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);font-size:11px;color:var(--muted);text-decoration:none;cursor:pointer;white-space:nowrap;}
+.attach-chip.linked{border-color:var(--gold-border);color:var(--gold);background:var(--gold-dim);}
+.attach-chip:active{opacity:0.7;}
+.audio-player{display:flex;align-items:center;gap:9px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+.play-btn{width:34px;height:34px;border-radius:50%;background:var(--terra);border:none;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;box-shadow:0 2px 8px rgba(184,92,56,0.35);transition:transform 0.12s;}
+.play-btn:active{transform:scale(0.88);}.play-btn.playing{background:#c07035;}
+.prog-col{flex:1;min-width:0;}
+.audio-lbl{font-size:10px;color:var(--muted);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.prog-track{height:3px;border-radius:2px;background:rgba(255,255,255,0.1);cursor:pointer;}
+.prog-fill{height:100%;border-radius:2px;background:var(--gold);width:0%;transition:width 0.08s linear;}
+.prog-times{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:3px;}
+.notes-area{width:100%;background:transparent;border:none;outline:none;color:var(--text);font-family:'Outfit',sans-serif;font-size:13.5px;line-height:1.65;resize:none;min-height:70px;}
+.notes-area::placeholder{color:rgba(122,114,100,0.55);font-style:italic;}
+.ov-hero{padding:20px 16px 14px;border-bottom:1px solid var(--border);}
+.ov-title{font-family:'Playfair Display',serif;font-size:26px;font-weight:400;}
+.ov-title em{font-style:italic;color:var(--gold);}
+.ov-sub{font-size:12px;color:var(--muted);margin-top:3px;}
+.stats{display:flex;gap:7px;padding:10px 14px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;}
+.stats::-webkit-scrollbar{display:none;}
+.stat{display:flex;flex-direction:column;align-items:center;padding:8px 13px;border-radius:11px;background:var(--surface);border:1px solid var(--border);flex-shrink:0;}
+.stat-n{font-family:'Playfair Display',serif;font-size:21px;color:var(--gold);line-height:1;}
+.stat-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-top:3px;}
+.ov-list{padding:8px 12px 0;}
+.ov-item{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--border);margin-bottom:6px;cursor:pointer;border-left:3px solid transparent;transition:background 0.13s;}
+.ov-item.greece{border-left-color:var(--aegean);}.ov-item.egypt{border-left-color:var(--gold);}.ov-item.transit{border-left-color:var(--muted);}
+.ov-item:active{background:var(--bg3);}
+.ov-day{font-family:'Playfair Display',serif;font-size:19px;color:var(--gold);width:26px;text-align:center;flex-shrink:0;}
+.ov-info{flex:1;min-width:0;}
+.ov-t{font-size:13.5px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ov-s{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ov-flag{font-size:19px;}
+.pack-wrap{padding:16px 16px 4px;}
+.pack-title{font-family:'Playfair Display',serif;font-size:24px;font-weight:400;}
+.pack-title em{font-style:italic;color:var(--gold);}
+.pack-sec{font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);padding:12px 16px 6px;display:flex;align-items:center;gap:8px;}
+.pack-sec::after{content:'';flex:1;height:1px;background:var(--border);}
+.pack-row{display:flex;align-items:center;gap:11px;padding:10px 16px;cursor:pointer;border-radius:9px;margin:0 8px;transition:background 0.12s;}
+.pack-row:active{background:var(--surface);}
+.pack-check{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;transition:all 0.15s;}
+.pack-check.done{background:var(--gold);border-color:var(--gold);color:#0e1117;}
+.pack-text{font-size:13.5px;flex:1;}
+.pack-row.done .pack-text{color:var(--muted);text-decoration:line-through;}
+.info-wrap{padding:16px 16px 4px;}
+.info-title{font-family:'Playfair Display',serif;font-size:24px;font-weight:400;}
+.info-title em{font-style:italic;color:var(--gold);}
+.info-block{margin:0 12px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:13px 14px;}
+.info-block-title{font-family:'Playfair Display',serif;font-size:14px;margin-bottom:6px;}
+.info-block-body{font-size:12.5px;color:rgba(232,226,212,0.82);line-height:1.7;}
+.info-block-body strong{color:var(--text);font-weight:600;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);z-index:200;display:none;align-items:flex-end;justify-content:center;}
+.overlay.open{display:flex;}
+.sheet{background:var(--bg2);border-radius:22px 22px 0 0;border-top:1px solid var(--border2);padding:14px 16px calc(var(--safe-b) + 26px);width:100%;max-width:430px;max-height:88vh;overflow-y:auto;animation:slideUp 0.22s ease;}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+.handle{width:36px;height:4px;border-radius:2px;background:var(--border2);margin:0 auto 16px;}
+.sheet-eyebrow{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.sheet-title{font-family:'Playfair Display',serif;font-size:21px;margin-bottom:16px;}
+.slbl{font-size:10px;letter-spacing:0.13em;text-transform:uppercase;color:var(--muted);margin-bottom:9px;}
+.type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:18px;}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:12px 6px;border-radius:12px;border:1.5px solid var(--border);background:rgba(255,255,255,0.02);cursor:pointer;transition:all 0.14s;user-select:none;}
+.tile:active{transform:scale(0.93);}.tile.sel{border-color:var(--gold);background:var(--gold-dim);}
+.tile .ti{font-size:23px;line-height:1;}.tile .tl{font-size:11px;color:var(--muted);font-weight:500;}.tile.sel .tl{color:var(--gold);}
+.link-box{display:flex;align-items:center;border:1px solid var(--border2);border-radius:11px;background:var(--bg3);overflow:hidden;margin-bottom:10px;}
+.link-pfx{padding:12px;font-size:16px;flex-shrink:0;border-right:1px solid var(--border);}
+.link-inp{flex:1;background:transparent;border:none;outline:none;padding:12px;font-family:'Outfit',sans-serif;font-size:13.5px;color:var(--text);min-width:0;}
+.link-inp::placeholder{color:rgba(122,114,100,0.5);font-style:italic;}
+.link-x{padding:12px 10px;color:var(--muted);cursor:pointer;font-size:16px;display:none;}
+.link-x.show{display:block;}
+.or-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.or-row::before,.or-row::after{content:'';flex:1;height:1px;background:var(--border);}
+.or-row span{font-size:11px;color:var(--muted);}
+.browse-btn{width:100%;padding:12px;border-radius:11px;border:1.5px dashed var(--border2);background:transparent;color:var(--muted);font-family:'Outfit',sans-serif;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+.browse-btn:active{background:rgba(255,255,255,0.04);}
+.linked-preview{display:none;align-items:center;gap:10px;padding:11px 13px;background:var(--bg3);border:1px solid var(--gold-border);border-radius:11px;margin-bottom:16px;}
+.linked-preview.show{display:flex;}
+.lp-icon{font-size:22px;flex-shrink:0;}.lp-info{flex:1;min-width:0;}
+.lp-name{font-size:13px;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lp-path{font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lp-x{font-size:17px;color:var(--muted);cursor:pointer;padding:5px;flex-shrink:0;}
+.lp-x:active{color:var(--red);}
+.note-inp{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:11px;padding:11px 13px;font-family:'Outfit',sans-serif;font-size:13.5px;color:var(--text);outline:none;resize:none;min-height:54px;margin-bottom:14px;}
+.note-inp:focus{border-color:var(--gold-border);}
+.note-inp::placeholder{color:rgba(122,114,100,0.5);font-style:italic;}
+.audio-hint{display:none;background:rgba(42,101,150,0.1);border:1px solid rgba(42,101,150,0.3);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:#6db3e8;line-height:1.55;}
+.audio-hint.show{display:block;}
+.sheet-actions{display:flex;gap:8px;}
+.btn-cancel{padding:13px 17px;background:rgba(255,255,255,0.04);border:1px solid var(--border2);border-radius:13px;font-family:'Outfit',sans-serif;font-size:14px;color:var(--muted);cursor:pointer;}
+.btn-save{flex:1;padding:13px;background:var(--gold);border:none;border-radius:13px;font-family:'Outfit',sans-serif;font-size:15px;font-weight:600;color:#0e1117;cursor:pointer;}
+.btn-save:active{opacity:0.85;}
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:rgba(14,17,23,0.97);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:7px 0 calc(var(--safe-b) + 7px);z-index:100;}
+.ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:var(--muted);cursor:pointer;padding:3px 0;font-family:'Outfit',sans-serif;transition:color 0.15s;}
+.ni.active{color:var(--gold);}
+.ni-icon{font-size:20px;}.ni-lbl{font-size:10px;letter-spacing:0.04em;}
+input[type="file"]{display:none!important;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <div><div class="hdr-title">Greece &amp; Egypt</div><div class="hdr-sub">May 2026 &middot; 17 days</div></div>
+  <div class="hdr-actions">
+    <div class="gps-pill" id="gpsPill" onclick="toggleGPS()"><div class="gps-dot"></div><span id="gpsLbl">GPS off</span></div>
+    <button class="today-btn" onclick="goToday()">Today</button>
+  </div>
+</div>
+<div class="strip-wrap" id="stripWrap"><div class="strip" id="strip"></div></div>
+<div class="scroll" id="mainScroll">
+  <div class="view active" id="viewDay"></div>
+  <div class="view" id="viewOverview"></div>
+  <div class="view" id="viewPacking"></div>
+  <div class="view" id="viewInfo"></div>
+</div>
+<div class="bnav">
+  <button class="ni" id="nav-overview" onclick="switchTab('overview')"><span class="ni-icon">&#128506;</span><span class="ni-lbl">Overview</span></button>
+  <button class="ni active" id="nav-day" onclick="switchTab('day')"><span class="ni-icon">&#128197;</span><span class="ni-lbl">Days</span></button>
+  <button class="ni" id="nav-packing" onclick="switchTab('packing')"><span class="ni-icon">&#127890;</span><span class="ni-lbl">Packing</span></button>
+  <button class="ni" id="nav-info" onclick="switchTab('info')"><span class="ni-icon">&#8505;</span><span class="ni-lbl">Info</span></button>
+</div>
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="handle"></div>
+    <div class="sheet-eyebrow" id="sheetEyebrow"></div>
+    <div class="sheet-title">Add Item</div>
+    <div class="slbl">What is this?</div>
+    <div class="type-grid" id="typeGrid">
+      <div class="tile sel" data-t="audio" onclick="selTile(this)"><span class="ti">&#127911;</span><span class="tl">Audio</span></div>
+      <div class="tile" data-t="flight" onclick="selTile(this)"><span class="ti">&#9992;&#65039;</span><span class="tl">Flight</span></div>
+      <div class="tile" data-t="hotel" onclick="selTile(this)"><span class="ti">&#127976;</span><span class="tl">Hotel</span></div>
+      <div class="tile" data-t="airbnb" onclick="selTile(this)"><span class="ti">&#127968;</span><span class="tl">Airbnb</span></div>
+      <div class="tile" data-t="car" onclick="selTile(this)"><span class="ti">&#128663;</span><span class="tl">Car</span></div>
+      <div class="tile" data-t="cab" onclick="selTile(this)"><span class="ti">&#128661;</span><span class="tl">Cab</span></div>
+      <div class="tile" data-t="attraction" onclick="selTile(this)"><span class="ti">&#128205;</span><span class="tl">Attraction</span></div>
+      <div class="tile" data-t="restaurant" onclick="selTile(this)"><span class="ti">&#127373;</span><span class="tl">Restaurant</span></div>
+      <div class="tile" data-t="other" onclick="selTile(this)"><span class="ti">&#128206;</span><span class="tl">Other</span></div>
+    </div>
+    <div class="audio-hint show" id="audioHint">&#127911; <strong>Audio guide</strong> — link your MP3 below. It shows as a player and can auto-play when you arrive (GPS).</div>
+    <div class="slbl">File or Link</div>
+    <div id="linkArea">
+      <div class="link-box">
+        <span class="link-pfx">&#128279;</span>
+        <input class="link-inp" id="linkInp" type="text" placeholder="Paste URL or file path…" oninput="onLinkType()">
+        <span class="link-x" id="linkX" onclick="clearLink()">&#10005;</span>
+      </div>
+      <div class="or-row"><span>or</span></div>
+      <label class="browse-btn" for="fileInput"><span style="font-size:18px">&#128194;</span> Browse files on this device</label>
+      <input type="file" id="fileInput" accept="*/*" onchange="onFilePick(event)">
+    </div>
+    <div class="linked-preview" id="linkedPreview">
+      <span class="lp-icon" id="lpIcon">&#128196;</span>
+      <div class="lp-info"><div class="lp-name" id="lpName"></div><div class="lp-path" id="lpPath"></div></div>
+      <span class="lp-x" onclick="clearLinked()">&#10005;</span>
+    </div>
+    <div class="slbl">Note <span style="font-size:9px;color:rgba(122,114,100,0.5);letter-spacing:0.06em">OPTIONAL</span></div>
+    <textarea class="note-inp" id="noteInp" placeholder="e.g. Confirmation #, opens at 8am, gate B2…"></textarea>
+    <div class="sheet-actions">
+      <button class="btn-cancel" onclick="closeSheet()">Cancel</button>
+      <button class="btn-save" onclick="saveItem()">Save</button>
+    </div>
+  </div>
+</div>
+<div id="audioPool" style="display:none"></div>
+<script>
+'use strict';
+const DAYS=[
+{day:1,date:'Fri May 1',country:'transit',flag:'✈️',title:'Departure',subtitle:'Toronto → Athens',
+flights:[{from:'YYZ',fromCity:'Toronto',to:'ATH',toCity:'Athens',airline:'Air Canada',flightNo:'AC896',ref:'BLM969',departs:'18:35',arrives:'May 2 · 11:10',duration:'~9h 35m',terminal:'Terminal 1, Pearson International Airport',mapQ:'Pearson International Airport Terminal 1 Toronto'}],
+stays:[],places:[],meals:[],
+tips:'Arrive at Pearson T1 at least 3 hrs early. Have passport, boarding pass and Egypt visa docs ready.',transport:''},
+{day:2,date:'Sat May 2',country:'greece',flag:'🇬🇷',title:'Arrive Athens',subtitle:'Settle in & explore on foot',
+flights:[],
+stays:[{type:'airbnb',name:'Athens Airbnb',address:'Garivaldi Street 3, Acropolis (2nd floor), Athina 117 42',mapQ:'Garivaldi Street 3 Athina 117 42 Greece',checkIn:'15:00',checkOut:'May 5 · 12:00',ref:'HMTHMSDYQ3',price:'€910'}],
+places:[{name:'Plaka Neighbourhood',time:'Afternoon',tips:'Charming old quarter — start wandering here after check-in.',gps:{lat:37.9733,lng:23.7305,r:300}},{name:'Anafiotika',time:'Afternoon',tips:'Tiny Cycladic-style alley climbing the Acropolis rock. Quick detour.'},{name:'Monastiraki & Psyrri',time:'Evening',tips:'Lively flea market square. Good for dinner vibe.'}],
+meals:[{name:'Ariston',note:'Famous pie bakery — snack on arrival.'},{name:'Maiandros Restaurant',note:'Traditional taverna. Veg/seafood/chicken. Also: Taverna O Psaras, Byzantino, Platanos.'}],
+tips:'No Acropolis ticket needed today — stay outside and soak in the atmosphere.',transport:'Taxi or Metro from ATH (Airport Metro to Monastiraki ~40 min)'},
+{day:3,date:'Sun May 3',country:'greece',flag:'🇬🇷',title:'Athens: Ancient Heart',subtitle:'Full walking day · no car',
+flights:[],
+stays:[{type:'airbnb',name:'Athens Airbnb',address:'Garivaldi Street 3, Acropolis (2nd floor), Athina 117 42',mapQ:'Garivaldi Street 3 Athina 117 42 Greece',checkIn:'—',checkOut:'—',ref:'HMTHMSDYQ3'}],
+places:[{name:'Acropolis & Parthenon',time:'08:00 – book timed entry',tips:'Ref FDEA6BD30C · €100 combo. Arrive at 8am — beat crowds and heat.',ref:'FDEA6BD30C',gps:{lat:37.9716,lng:23.7257,r:300}},{name:'Theatre of Dionysus',time:'After Acropolis',tips:'Oldest stone theatre in the world. Just below the rock.'},{name:'Areopagus Hill',time:'After Acropolis',tips:'Free! Slippery marble but panoramic views over Athens.'},{name:'Ancient Agora',time:'Mid-morning',tips:'Civic heart of ancient Athens. Temple of Hephaestus is stunning.',gps:{lat:37.9752,lng:23.7206,r:250}},{name:'Varvakios Central Market',time:'Before lunch',tips:'Athens vibrant fish & meat market. Great atmosphere.'},{name:'Temple of Olympian Zeus',time:'Afternoon – optional',tips:'Towering columns. Impressive even from outside.'},{name:'Acropolis Museum',time:'Afternoon',tips:'World-class. Air-conditioned — perfect for hot afternoon.',gps:{lat:37.9681,lng:23.7292,r:200}}],
+meals:[{name:'Diporto Taverna',note:'Hidden basement spot. Chickpea soup or daily special. Veg/seafood.'},{name:'Light dinner near Koukaki/Plaka',note:''}],
+tips:'Combo ticket covers multiple sites. Wear comfortable shoes. Bring water & sun protection.',transport:'Walk all day'},
+{day:4,date:'Mon May 4',country:'greece',flag:'🇬🇷',title:'Museums & Lycabettus',subtitle:'Archaeology museum + sunset hill',
+flights:[],
+stays:[{type:'airbnb',name:'Athens Airbnb',address:'Garivaldi Street 3, Acropolis (2nd floor), Athina 117 42',mapQ:'Garivaldi Street 3 Athina 117 42 Greece',checkIn:'—',checkOut:'—',ref:'HMTHMSDYQ3'}],
+places:[{name:'National Archaeological Museum',time:'08:30',tips:"World's finest collection of ancient Greek art. Allow 2–3 hrs minimum.",gps:{lat:37.9893,lng:23.7322,r:200}},{name:'Ama Lachei',time:'12:30 – 13:30',tips:'Reservation: ABLZZD · Kallidromiou 69, Athina 106 83.',ref:'ABLZZD',mapQ:'Kallidromiou 69 Athina 106 83 Greece'},{name:'Lycabettus Hill',time:'~75 min before sunset',tips:'Take the funicular up (tickets on site). Walk down for views. Breathtaking panorama.',gps:{lat:37.9803,lng:23.7440,r:300}}],
+meals:[{name:'Ama Lachei',note:'Res: ABLZZD · 12:30–13:30 · Kallidromiou 69'},{name:'Dinner near Koukaki / Plaka',note:''}],
+tips:'Funicular runs until late. Go ~60–75 min before sunset for golden hour.',transport:'Metro / Taxi + funicular'},
+{day:5,date:'Tue May 5',country:'greece',flag:'🇬🇷',title:'Fly to Santorini',subtitle:'ATH → JTR · Oia arrival',
+flights:[{from:'ATH',fromCity:'Athens',to:'JTR',toCity:'Santorini',airline:'Aegean Air',flightNo:'A3354',ref:'78WFFA',departs:'10:05',arrives:'10:55',duration:'50m',price:'€434',terminal:'Building 57, Athens International Airport',mapQ:'Athens International Airport'}],
+stays:[{type:'airbnb',name:'Santorini Airbnb (Oia)',address:'Oia, Egeo 847 02, Greece',mapQ:'Oia Santorini Greece',checkIn:'13:00',checkOut:'May 9 · 12:00',ref:'HMSAF8B2DH',price:'€1290'}],
+places:[{name:'Oia Village wander',time:'Afternoon',tips:'Blue domes, narrow lanes, caldera views. Just explore on foot.'},{name:'Oia Sunset',time:'~20:30',tips:'Arrive 30–45 min early at the castle viewpoint. Very crowded but spectacular.',gps:{lat:36.4618,lng:25.3753,r:250}}],
+meals:[{name:'Ammoudi Fish Tavern',note:'Down 300 steps below Oia. Seafood. Reserve in advance.'}],
+tips:'Oia is pedestrian — expect walking with luggage. Pre-book transfer from Santorini airport.',transport:'Aegean A3354 · 78WFFA · Transfer JTR→Oia'},
+{day:6,date:'Wed May 6',country:'greece',flag:'🇬🇷',title:'Santorini by Car',subtitle:'Red Beach · Lighthouse · Santo Wines',
+flights:[],
+stays:[{type:'airbnb',name:'Santorini Airbnb (Oia)',address:'Oia, Egeo 847 02, Greece',mapQ:'Oia Santorini Greece',checkIn:'—',checkOut:'—',ref:'HMSAF8B2DH'},{type:'car',name:'Motor Inn Car Rental',ref:'#11625',checkIn:'08:00 May 6',checkOut:'18:00 May 7',price:'€150'}],
+places:[{name:'Red Beach',time:'Morning',tips:'Park and walk 10 min. Bring water shoes. Dramatic red volcanic cliffs.',gps:{lat:36.3497,lng:25.3960,r:300}},{name:'Akrotiri Lighthouse',time:'Mid-morning',tips:'Scenic southern tip. Great photos.'},{name:'Santo Wines Winery',time:'Lunch',tips:'Book ahead. Wine tasting + food with caldera views.',gps:{lat:36.3846,lng:25.4271,r:200}},{name:'Selene Restaurant (Fira)',time:'Optional dinner',tips:'Fine dining with Assyrtiko and Vinsanto.'}],
+meals:[{name:'Oia bakery (Grigoris)',note:'Breakfast before heading out.'},{name:'Santo Wines',note:'Wine tasting + plates.'},{name:'Oia walkable dinner',note:'Return by 15:00–16:00 to secure parking.'}],
+tips:'Car rental #11625. Return to Oia by 15:00–16:00 to secure parking before sunset crowds.',transport:'Rental car – Motor Inn #11625'},
+{day:7,date:'Thu May 7',country:'greece',flag:'🇬🇷',title:'Santorini Villages',subtitle:'06:00 sunrise photo · village loop',
+flights:[],
+stays:[{type:'airbnb',name:'Santorini Airbnb (Oia)',address:'Oia, Egeo 847 02, Greece',mapQ:'Oia Santorini Greece',checkIn:'—',checkOut:'—',ref:'HMSAF8B2DH'},{type:'car',name:'Motor Inn Car Rental (return 18:00)',ref:'#11625',checkIn:'—',checkOut:'18:00 May 7',price:''}],
+places:[{name:'Three Bells of Fira (Firostefani)',time:'06:00 sunrise',tips:'Drive early for the iconic blue domes at sunrise. Empty at 6am.',gps:{lat:36.4265,lng:25.4214,r:200}},{name:'Pyrgos Village',time:'Morning',tips:'Hilltop medieval village with great views.'},{name:'Emporio',time:'Morning',tips:'Venetian-style fortified village.'},{name:'Agios Nikolaos / Megalochori',time:'Mid-morning',tips:'Quiet authentic village.'},{name:'Perissa Black Beach',time:'Afternoon',tips:'Long black sand beach with tavernas.'},{name:'Fratzescos Taverna',time:'Lunch/Early dinner',tips:'Seafood at Perissa. Great value.',gps:{lat:36.3544,lng:25.4771,r:200}},{name:'Metaxi Mas Restaurant',time:'Optional',tips:'Excellent local restaurant — book ahead.'}],
+meals:[{name:'Oia bakery',note:'Breakfast.'},{name:'Fratzescos',note:'Seafood at Perissa.'},{name:'Metaxi Mas',note:'Optional dinner.'}],
+tips:'Return car at 18:00 at meeting point. Be back in Oia before 16:30.',transport:'Rental car until 18:00 then return'},
+{day:8,date:'Fri May 8',country:'greece',flag:'🇬🇷',title:'Caldera Walk Day',subtitle:'Imerovigli → Fira · No car',
+flights:[],
+stays:[{type:'airbnb',name:'Santorini Airbnb (Oia)',address:'Oia, Egeo 847 02, Greece',mapQ:'Oia Santorini Greece',checkIn:'—',checkOut:'—',ref:'HMSAF8B2DH'}],
+places:[{name:'Caldera Rim Walk to Imerovigli',time:'Morning',tips:'Walk south from Oia along the caldera rim. Stunning.'},{name:'Three Bells (Firostefani)',time:'En route',tips:'Iconic church — calmer in the morning.'},{name:'Fira Town',time:'Mid-morning',tips:'Browse, coffee, cable car area.'},{name:'Atlantis Books',time:'Fira',tips:'Famous bookshop carved into the caldera cliff.',gps:{lat:36.4167,lng:25.4318,r:150}},{name:'Oia Sunset – last one!',time:'~20:30',tips:'Final Santorini sunset.'}],
+meals:[{name:'Oia bakery',note:'Breakfast.'},{name:'Fira casual lunch',note:'Veg/seafood/chicken.'},{name:'Oia dinner',note:'Last Santorini dinner!'}],
+tips:'Use KTEL bus to Fira if you prefer not to walk.',transport:'Bus / walking (KTEL via Fira)'},
+{day:9,date:'Sat May 9',country:'transit',flag:'✈️',title:'Santorini → Cairo',subtitle:'Two flights · Egypt arrival',
+flights:[{from:'JTR',fromCity:'Santorini',to:'ATH',toCity:'Athens',airline:'Aegean Air',flightNo:'A3357',ref:'7RGU22',departs:'12:30',arrives:'13:20',duration:'50m',terminal:'Santorini Airport, Thera 847 00'},{from:'ATH',fromCity:'Athens',to:'CAI',toCity:'Cairo',airline:'Aegean Air',flightNo:'A3934',ref:'7RGU22',departs:'17:05',arrives:'19:05',duration:'2h',terminal:'Non-Schengen Area, Athens Airport',price:'€630 total'}],
+stays:[{type:'hotel',name:'Ramses Hilton',address:'1115 Nile Corniche, Sharkas, Bulaq, Cairo Governorate 12344, Egypt',mapQ:'Ramses Hilton 1115 Nile Corniche Cairo Egypt',checkIn:'15:00',checkOut:'May 12 · 12:00',ref:'3427091559',price:'€850'},{type:'cab',name:'Rimotours Airport Transfer',ref:'1764326471',checkIn:'On arrival',price:'€36'}],
+places:[],meals:[{name:'Hotel or nearby',note:'Keep it simple after a travel day.'}],
+tips:'Have passport & Egypt visa docs ready. Cairo airport transfer: Rimotours ref 1764326471.',transport:'Aegean 7RGU22 · Rimotours transfer 1764326471'},
+{day:10,date:'Sun May 10',country:'egypt',flag:'🇪🇬',title:'Giza & The Great Museum',subtitle:'Pyramids morning · GEM afternoon',
+flights:[],
+stays:[{type:'hotel',name:'Ramses Hilton',address:'1115 Nile Corniche, Cairo',mapQ:'Ramses Hilton 1115 Nile Corniche Cairo Egypt',checkIn:'—',checkOut:'—',ref:'3427091559'}],
+places:[{name:'Giza Plateau & Sphinx',time:'08:00 – arrive early!',tips:'No camel rides. Licensed guides at the gate. Small cash for tips.',gps:{lat:29.9773,lng:31.1325,r:500}},{name:'Grand Egyptian Museum (GEM)',time:'Afternoon',tips:'New world-class museum. Book timed entry. Allow 3+ hrs.',gps:{lat:29.9876,lng:31.1121,r:300}}],
+meals:[{name:'Near Giza / GEM',note:'Veg/chicken options.'},{name:'Downtown / Nile side',note:'Hotel or Nile-view option for dinner.'}],
+tips:'Use Uber for Giza — much easier. Keep small bills for baksheesh.',transport:'Uber recommended'},
+{day:11,date:'Mon May 11',country:'egypt',flag:'🇪🇬',title:'Cairo: Mummies & Markets',subtitle:'NMEC · Citadel · Khan el-Khalili',
+flights:[],
+stays:[{type:'hotel',name:'Ramses Hilton',address:'1115 Nile Corniche, Cairo',mapQ:'Ramses Hilton 1115 Nile Corniche Cairo Egypt',checkIn:'—',checkOut:'—',ref:'3427091559'}],
+places:[{name:'NMEC – Royal Mummies Hall',time:'Morning (opens 09:00)',tips:'Ref EUCAP50C · €50 · 22 royal mummies. Last entry 16:00.',ref:'EUCAP50C',gps:{lat:30.0018,lng:31.2339,r:250}},{name:'Zooba Maadi',time:'Lunch',tips:'Modern Egyptian street food. Mezze, eggplant, taameya. Veg-friendly.',gps:{lat:30.0200,lng:31.2300,r:200}},{name:'Cairo Citadel (Saladin)',time:'Afternoon – go before 15:00',tips:'Medieval fortress + Mosque of Muhammad Ali. Great views.',gps:{lat:30.0288,lng:31.2598,r:300}},{name:'Khan el-Khalili Bazaar',time:'Evening',tips:'Enormous medieval bazaar. Negotiate everything.',gps:{lat:30.0478,lng:31.2627,r:300}}],
+meals:[{name:'Zooba Maadi',note:'Lunch — modern Egyptian street food.'},{name:'Naguib Mahfouz Café',note:'Dinner inside Khan el-Khalili. Mezze + chicken/seafood.'}],
+tips:'NMEC: allocate 2.5 hrs. Dress modestly for Citadel mosque. Go earlier to avoid afternoon heat.',transport:'Uber all day'},
+{day:12,date:'Tue May 12',country:'egypt',flag:'🇪🇬',title:'Fly to Luxor',subtitle:'CAI → LXR · Luxor Temple at night',
+flights:[{from:'CAI',fromCity:'Cairo',to:'LXR',toCity:'Luxor',airline:'EgyptAir',flightNo:'MS274',ref:'XLSFIV',departs:'13:40',arrives:'14:45',duration:'1h 5m',price:'€362',terminal:'Terminal 3, Cairo International Airport, Heliopolis',mapQ:'Cairo International Airport Terminal 3'}],
+stays:[{type:'hotel',name:'Steigenberger Nile Palace',address:'Khaled Ben El-Waleed Street, Gazirat Al Awameyah, Luxor Governorate 85111',mapQ:'Steigenberger Nile Palace Luxor Egypt',checkIn:'15:00',checkOut:'May 14 · 12:00',ref:'72071424803190',price:'€432'}],
+places:[{name:'Luxor Temple',time:'Night visit (illuminated)',tips:'Spectacular when lit up. Walk the sphinx avenue.',gps:{lat:25.6996,lng:32.6391,r:250}}],
+meals:[{name:'Hotel or nearby',note:'Light meal then Luxor Temple at night. Dessert/tea after.'}],
+tips:'Confirm May 13 West Bank pickup (DTL006) with hotel concierge tonight.',transport:'EgyptAir MS274 · Hotel transfer from Luxor Airport'},
+{day:13,date:'Wed May 13',country:'egypt',flag:'🇪🇬',title:'Luxor: West Bank Day',subtitle:'Valley of Kings · Felucca · Karnak',
+flights:[],
+stays:[{type:'hotel',name:'Steigenberger Nile Palace',address:'Khaled Ben El-Waleed St, Luxor',mapQ:'Steigenberger Nile Palace Luxor Egypt',checkIn:'—',checkOut:'—',ref:'72071424803190'}],
+places:[{name:'Valley of the Kings',time:'05:15 pickup',tips:'Tour DTL006. Go early — heat is brutal by 10am. Std ticket = 3 tombs. Tutankhamun extra.',ref:'DTL006',gps:{lat:25.7402,lng:32.6014,r:400}},{name:'Colossi of Memnon',time:'After Valley',tips:'Free! Two giant statues on the West Bank road.'},{name:'Temple of Hatshepsut',time:'After Memnon',tips:'Dramatic terraced temple carved into the cliff.',gps:{lat:25.7379,lng:32.6073,r:300}},{name:'Sunset Felucca Ride',time:'~17:00–18:45',tips:'DTL025. Sailing the Nile at sunset. Finish by 18:45.',ref:'DTL025',gps:{lat:25.6967,lng:32.6383,r:500}},{name:'Karnak Sound & Light Show',time:'Later show',tips:'DTL025. Karnak illuminated with narration.',ref:'DTL025',gps:{lat:25.7188,lng:32.6573,r:400}}],
+meals:[{name:'Hotel lunch after tour',note:'Return from West Bank.'},{name:'Light dinner before Karnak show',note:''}],
+tips:'Hotel tours: DTL006 (West Bank) + DTL025 (Felucca + Karnak). Ask concierge for felucca finish by 18:45.',transport:'Hotel tours DTL006 + DTL025'},
+{day:14,date:'Thu May 14',country:'transit',flag:'✈️',title:'Luxor → Athens → Sounion',subtitle:'Two flights · Cape Sounion drive',
+flights:[{from:'LXR',fromCity:'Luxor',to:'CAI',toCity:'Cairo',airline:'EgyptAir',flightNo:'MS61',ref:'YLFVAQ',departs:'06:30',arrives:'07:40',duration:'1h 10m',terminal:'Luxor International Airport'},{from:'CAI',fromCity:'Cairo',to:'ATH',toCity:'Athens',airline:'EgyptAir',flightNo:'MS747',ref:'YLFVAQ',departs:'10:10',arrives:'12:10',duration:'2h',terminal:'Terminal 3, Cairo International Airport',price:'€896 total'}],
+stays:[{type:'airbnb',name:'Home in Koropi',address:'Leoforos Vasileos Konstantinou 92, Koropi, 194 00, Greece',mapQ:'Leoforos Vasileos Konstantinou 92 Koropi Greece',checkIn:'14:00',checkOut:'May 15 · 11:00',ref:'HMW4NAPMZZ',price:'€118'},{type:'car',name:'Europcar Athens',ref:'1199735672',checkIn:'May 14 · 12:00 (ATH pickup)',checkOut:'May 17 · 12:00',price:'€118'}],
+places:[{name:'Temple of Poseidon, Cape Sounion',time:'16:00–17:00 (1 hr)',tips:'~1 hr drive from Athens. Cliff-top temple at golden hour.',gps:{lat:37.6498,lng:24.0260,r:300},mapQ:'Temple of Poseidon Cape Sounion Greece'},{name:'Taverna Syrtaki',time:'Dinner at Sounion',tips:'Right by the sea. Seafood/chicken.'}],
+meals:[{name:'Airport / plane',note:'En route.'},{name:'Taverna Syrtaki',note:'Seafood/chicken at Sounion.'}],
+tips:'Very early 6:30am flight from Luxor. Europcar pickup at ATH at 12:00 (ref 1199735672).',transport:'EgyptAir YLFVAQ · Europcar 1199735672 (ATH pickup 12:00)'},
+{day:15,date:'Fri May 15',country:'greece',flag:'🇬🇷',title:'Drive to Meteora',subtitle:'Optional Thermopylae · Kalambaka',
+flights:[],
+stays:[{type:'airbnb',name:'Meteora Airbnb',address:'Rammidi 22, Kalampaka, 422 00, Greece',mapQ:'Rammidi 22 Kalampaka Greece',checkIn:'14:00',checkOut:'May 16 · 11:00',ref:'HMFTD23DHF',price:'Free'}],
+places:[{name:'Thermopylae (optional stop)',time:'En route',tips:'Famous 300 Spartans site. ~30 min detour.'},{name:'Meteora Sunset Viewpoints',time:'Evening',tips:'Drive to viewpoints around Kastraki. Monasteries perched on rock pillars — surreal.',gps:{lat:39.7217,lng:21.6306,r:1000}}],
+meals:[{name:'Bakery before leaving Koropi',note:'Breakfast.'},{name:'Road stop lunch',note:'En route.'},{name:'Kalambaka taverna',note:'Town at the base of Meteora.'}],
+tips:'Monasteries require modest dress (no shorts, cover shoulders). Bring cash for €5 entry fees.',transport:'Rental car (Europcar 1199735672)'},
+{day:16,date:'Sat May 16',country:'greece',flag:'🇬🇷',title:'Meteora Monasteries',subtitle:'Morning visit · Drive to airport hotel',
+flights:[],
+stays:[{type:'hotel',name:'Kallisti Stay',address:'25is Martiou 14, Spata-Artemida, Attica, 19016 Greece',mapQ:'25is Martiou 14 Spata-Artemida Attica Greece',checkIn:'14:00',checkOut:'May 17 · 11:00',ref:'73403342462436',price:'Free'}],
+places:[{name:'Great Meteoron Monastery',time:'08:00',tips:'Oldest & largest. Opens 08:00 in summer.',gps:{lat:39.7280,lng:21.6256,r:200}},{name:'Varlaam Monastery',time:'After Great Meteoron',tips:'Beautiful frescoes. €5 entry.',gps:{lat:39.7261,lng:21.6277,r:200}},{name:'Rousanou Monastery',time:'Optional',tips:'Perched on a narrow pinnacle.'}],
+meals:[{name:'After monasteries',note:'Kalambaka or road stop.'},{name:'Near Spata / airport',note:'Simple dinner near the hotel.'}],
+tips:'Monastery entry: €5/person each (cash only). Return car by 18:00. Drive ~3.5 hrs back to airport area.',transport:'Rental car — return before check-in'},
+{day:17,date:'Sun May 17',country:'transit',flag:'🏠',title:'Fly Home',subtitle:'Athens → Toronto · AC921',
+flights:[{from:'ATH',fromCity:'Athens',to:'YYZ',toCity:'Toronto',airline:'Air Canada',flightNo:'AC921',ref:'BLM969',departs:'15:25',arrives:'~19:05',duration:'~11h',terminal:'Athens International Airport',mapQ:'Athens International Airport'}],
+stays:[],places:[],meals:[{name:'Airport meal',note:''}],
+tips:'Return Europcar by 12:00–12:30. Allow time for car drop-off + shuttle to terminal. Arrive check-in ~12:30.',transport:'Return Europcar by 12:00 · Flight AC921 15:25'}
+];
+const PACKING={'Documents & Finance':['Passport (valid 6+ months)','Travel insurance printed','AC896 ref BLM969 (Toronto→Athens)','Aegean 78WFFA (Athens→Santorini)','Aegean 7RGU22 (Santorini→Cairo)','EgyptAir XLSFIV (Cairo→Luxor)','EgyptAir YLFVAQ (Luxor→Athens)','AC921 ref BLM969 (Athens→Toronto)','Europcar 1199735672','Athens Airbnb HMTHMSDYQ3','Santorini Airbnb HMSAF8B2DH','Ramses Hilton 3427091559','Steigenberger Luxor 72071424803190','Koropi HMW4NAPMZZ','Meteora HMFTD23DHF','Kallisti Stay 73403342462436','Rimotours 1764326471','Euros (cash)','Egyptian Pounds (EGP)','USD for Egypt tips'],'Clothing — Greece':['Light summer clothes (4–5 days)','Swimwear (2 sets)','Modest layer for monasteries/churches','Comfortable walking shoes','Evening outfit (smart-casual)','Light jacket for evenings'],'Clothing — Egypt':['Modest tops (shoulders covered)','Long trousers/skirts for temples','Sun hat (essential!)','Light scarf/shawl','Sandals / flat shoes'],'Health & Toiletries':['SPF 50+ sunscreen (lots!)','After-sun lotion','Insect repellent',"Traveller's diarrhoea meds",'Pain/fever medication','Antihistamines','Prescription medications','ORS sachets (Egypt heat)'],'Tech & Gear':['Phone + charger','Universal travel adapter (EU/EG)','Portable power bank','Earphones/AirPods (audio guides!)','Camera + memory cards','Waterproof phone pouch'],'Misc':['Small backpack / day bag','Reusable water bottle','Earplugs + eye mask','Snacks for travel days','Small bills for tips']};
+let curDay=1,curTab='day',gpsOn=false,gpsWid=null,uLat=null,uLng=null,modalDay=null,selType='audio',pendingFile=null;
+const audioEls={},trigLog={};
+const S={get:k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}},notes:d=>S.get('n'+d)||'',setNote:(d,v)=>S.set('n'+d,v),extra:d=>S.get('x'+d)||[],addExtra:(d,i)=>{const a=S.extra(d);a.push(i);S.set('x'+d,a)},pack:()=>S.get('pack')||{},togglePack:k=>{const p=S.pack();p[k]=!p[k];S.set('pack',p);return p[k]},audioMeta:k=>S.get('am'+k),setAudioMeta:(k,m)=>S.set('am'+k,m)};
+function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('TripAudio',1);r.onupgradeneeded=e=>e.target.result.createObjectStore('audio',{keyPath:'id'});r.onsuccess=e=>res(e.target.result);r.onerror=rej;})}
+async function saveBlob(k,b){const db=await openDB();return new Promise((res,rej)=>{const tx=db.transaction('audio','readwrite');tx.objectStore('audio').put({id:k,blob:b});tx.oncomplete=res;tx.onerror=rej;})}
+async function loadBlob(k){const db=await openDB();return new Promise(res=>{const tx=db.transaction('audio','readonly');const r=tx.objectStore('audio').get(k);r.onsuccess=e=>res(e.target.result?.blob||null);r.onerror=()=>res(null);})}
+async function init(){if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});buildStrip();buildOverview();buildPacking();buildInfo();const today=new Date(),start=new Date('2026-05-01');const diff=Math.floor((today-start)/86400000)+1;curDay=(diff>=1&&diff<=17)?diff:1;await renderDay(curDay);setChipActive();if('Notification'in window)Notification.requestPermission();}
+function buildStrip(){document.getElementById('strip').innerHTML=DAYS.map(d=>`<div class="chip ${d.country}" id="chip${d.day}" onclick="selectDay(${d.day})"><span class="cn">${d.day}</span><span class="cf">${d.flag}</span><div class="chip-dot"></div></div>`).join('');}
+function setChipActive(){document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));const c=document.getElementById('chip'+curDay);if(c){c.classList.add('active');c.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});}}
+async function selectDay(n){curDay=n;setChipActive();await renderDay(n);switchTab('day');}
+function fIcon(n){if(!n)return'📎';if(/\.(mp3|m4a|wav|aac|ogg)$/i.test(n))return'🎧';if(/\.pdf$/i.test(n))return'📄';if(/\.(xlsx?|csv)$/i.test(n))return'📊';if(/\.(jpe?g|png|gif|heic)$/i.test(n))return'🖼';return'🔗';}
+function bkRow(ref,mapQ){return`<div class="bk-row"><div><span class="ref-lbl">Ref</span><span class="ref-code">${ref}</span></div>${mapQ?`<a class="map-btn" href="https://maps.google.com/?q=${encodeURIComponent(mapQ)}" target="_blank">📍 Map</a>`:''}</div>`;}
+function ciRow(ci,co){if(!ci||ci==='—')return'';return`<div class="ci-row"><div class="ci-box"><div class="ci-lbl">Check-in</div><div class="ci-val">${ci}</div></div><div class="ci-box"><div class="ci-lbl">Check-out</div><div class="ci-val">${co}</div></div></div>`;}
+function audioBlockHTML(k){return`<div class="audio-player" id="ap${k}" style="display:none"><button class="play-btn" id="pb${k}" onclick="togglePlay('${k}')">▶</button><div class="prog-col"><div class="audio-lbl" id="albl${k}">🎧 Audio guide</div><div class="prog-track" id="pt${k}" onclick="seekAudio(event,'${k}')"><div class="prog-fill" id="pf${k}"></div></div><div class="prog-times"><span id="ct${k}">0:00</span><span id="dt${k}">—</span></div></div></div><div class="attach-strip" id="aus${k}"><label class="attach-chip" for="af${k}">🎧 Link audio file</label><input type="file" id="af${k}" accept="audio/*" onchange="handleAudio(event,'${k}')"></div>`;}
+async function renderDay(n){
+  const d=DAYS.find(x=>x.day===n);if(!d)return;
+  const extra=S.extra(n),notes=S.notes(n);
+  const words=d.title.split(' '),lw=words.pop();
+  let h=`<div class="hero"><div class="hero-glow ${d.country}"></div><div class="eyebrow">Day ${d.day} of 17 · ${d.date}</div><h1 class="hero-title">${words.join(' ')} <em>${lw}</em></h1><div class="hero-sub">${d.subtitle}</div><div class="badges"><span class="badge ${d.country}">${d.flag} ${d.country.charAt(0).toUpperCase()+d.country.slice(1)}</span>${d.transport?`<span class="badge sm">🚗 ${d.transport}</span>`:''}</div></div>`;
+  if(d.flights.length){h+=`<div class="sec">✈️ Flights</div><div class="cards">`;d.flights.forEach(f=>{h+=`<div class="card flight"><div class="card-row"><div class="card-sub">${f.airline}${f.flightNo?' · '+f.flightNo:''}</div>${f.price?`<span style="font-size:11px;color:var(--muted)">${f.price}</span>`:''}</div><div class="f-route"><div class="f-city"><div class="f-code">${f.from}</div><div class="f-name">${f.fromCity}</div></div><div class="f-line"><div class="f-plane">✈</div></div><div class="f-city"><div class="f-code">${f.to}</div><div class="f-name">${f.toCity}</div></div></div><div class="f-meta"><span>🛫 ${f.departs}</span><span>⏱ ${f.duration}</span><span>🛬 ${f.arrives}</span></div>${f.terminal?`<div class="card-detail" style="margin-top:6px">🏢 ${f.terminal}</div>`:''}`+bkRow(f.ref,f.mapQ||null)+`</div>`;});h+=`</div>`;}
+  if(d.stays&&d.stays.length){h+=`<div class="sec">🏨 Accommodation</div><div class="cards">`;d.stays.forEach((s,si)=>{const ic={hotel:'🏨',airbnb:'🏠',car:'🚗',cab:'🚕'}[s.type]||'🏨';const cc={hotel:'hotel',airbnb:'airbnb',car:'car',cab:'car'}[s.type]||'hotel';h+=`<div class="card ${cc}"><div class="card-row"><span style="font-size:14px">${ic}</span><span class="card-title" style="flex:1;margin-left:6px">${s.name}</span>${s.price&&s.price!=='Free'?`<span style="font-size:11px;color:var(--muted)">${s.price}</span>`:''}</div>${s.address?`<div class="addr-row"><span class="addr-icon">📍</span><span class="addr-text">${s.address}</span></div>`:''}`+ciRow(s.checkIn,s.checkOut)+bkRow(s.ref,s.mapQ||null)+(s.note?`<div class="card-detail">${s.note}</div>`:'')+`</div>`;});h+=`</div>`;}
+  if(d.places&&d.places.length){h+=`<div class="sec">📍 Attractions</div>`;for(let i=0;i<d.places.length;i++){const p=d.places[i],ak=`d${n}p${i}`;h+=`<div class="cards"><div class="card place"><div class="card-title">${p.name}</div>${p.time?`<div class="card-sub">${p.time}</div>`:''}<div class="card-detail">💡 ${p.tips}</div>${p.ref?bkRow(p.ref,p.mapQ||null):''}${p.gps?`<div style="margin-top:6px;font-size:10px;color:var(--green)">📡 GPS audio trigger active</div>`:''}<div id="audiowrap${ak}">${audioBlockHTML(ak)}</div></div></div>`;}}
+  if(d.meals&&d.meals.length){h+=`<div class="sec">🍽 Food & Drink</div><div class="cards">`;d.meals.forEach(m=>{h+=`<div class="card meal"><div class="card-title">${m.name}</div>${m.note?`<div class="card-detail">${m.note}</div>`:''}</div>`;});h+=`</div>`;}
+  if(extra.length){h+=`<div class="sec">⭐ Added</div><div class="cards">`;extra.forEach((item,xi)=>{const icons={audio:'🎧',flight:'✈️',hotel:'🏨',airbnb:'🏠',car:'🚗',cab:'🚕',attraction:'📍',restaurant:'🍽',other:'📎'};const ak=`d${n}x${xi}`;h+=`<div class="card place" style="border-color:var(--gold-border)"><div class="card-title">${icons[item.type]||'📌'} ${item.name||item.type}</div>${item.note?`<div class="card-detail">${item.note}</div>`:''}`+(item.type==='audio'?`<div id="audiowrap${ak}">${audioBlockHTML(ak)}</div>`:item.fileRef?`<div class="attach-strip"><a class="attach-chip linked" href="#">${fIcon(item.fileRef)} ${item.fileRef.split('/').pop()||item.fileRef}</a></div>`:'')+`</div>`;});h+=`</div>`;}
+  if(d.tips)h+=`<div class="sec">💡 Day Tips</div><div class="cards"><div class="card tip"><div class="card-detail">${d.tips}</div></div></div>`;
+  h+=`<div class="sec">📝 My Notes</div><div class="cards"><div class="card tip"><textarea class="notes-area" id="na${n}" placeholder="Add thoughts, reminders…" oninput="S.setNote(${n},this.value)">${notes}</textarea></div></div>`;
+  h+=`<div class="cards" style="margin-top:4px"><div class="card add-btn" onclick="openSheet(${n})"><div style="font-size:22px;margin-bottom:3px">＋</div><div style="font-size:12px;font-weight:500">Add flight, place, audio, file…</div></div></div>`;
+  const view=document.getElementById('viewDay');view.innerHTML=h;view.classList.add('fade');setTimeout(()=>view.classList.remove('fade'),400);
+  for(let i=0;i<(d.places||[]).length;i++)await restoreAudio(`d${n}p${i}`,d.places[i].name);
+  extra.forEach(async(item,xi)=>{if(item.type==='audio')await restoreAudio(`d${n}x${xi}`,item.name||'Audio');});
+}
+async function handleAudio(evt,k){const f=evt.target.files[0];if(!f)return;const blob=new Blob([await f.arrayBuffer()],{type:f.type});await saveBlob(k,blob);S.setAudioMeta(k,{name:f.name,type:f.type});showPlayer(k,URL.createObjectURL(blob),f.name);markChipFile(k);}
+async function restoreAudio(k,fb){const blob=await loadBlob(k);if(!blob)return;const meta=S.audioMeta(k)||{name:fb||'Audio'};showPlayer(k,URL.createObjectURL(blob),meta.name);markChipFile(k);}
+function showPlayer(k,url,name){let a=document.getElementById('aud'+k);if(!a){a=document.createElement('audio');a.id='aud'+k;document.getElementById('audioPool').appendChild(a);}a.src=url;audioEls[k]=a;a.ontimeupdate=()=>updateProg(k);a.onended=()=>{const b=document.getElementById('pb'+k);if(b){b.textContent='▶';b.classList.remove('playing');}};a.onloadedmetadata=()=>{const el=document.getElementById('dt'+k);if(el)el.textContent=fmt(a.duration);};const ap=document.getElementById('ap'+k);if(ap)ap.style.display='flex';const aus=document.getElementById('aus'+k);if(aus)aus.style.display='none';const lbl=document.getElementById('albl'+k);if(lbl)lbl.textContent='🎧 '+name;}
+function togglePlay(k){const a=audioEls[k];if(!a)return;const b=document.getElementById('pb'+k);if(a.paused){Object.entries(audioEls).forEach(([j,x])=>{if(j!==k&&!x.paused){x.pause();const bb=document.getElementById('pb'+j);if(bb){bb.textContent='▶';bb.classList.remove('playing');}}});a.play();if(b){b.textContent='⏸';b.classList.add('playing');}}else{a.pause();if(b){b.textContent='▶';b.classList.remove('playing');}}}
+function updateProg(k){const a=audioEls[k];if(!a||!a.duration)return;const p=(a.currentTime/a.duration)*100;const pf=document.getElementById('pf'+k);if(pf)pf.style.width=p+'%';const ct=document.getElementById('ct'+k);if(ct)ct.textContent=fmt(a.currentTime);}
+function seekAudio(evt,k){const a=audioEls[k];const tr=document.getElementById('pt'+k);if(!a||!a.duration||!tr)return;const r=tr.getBoundingClientRect();a.currentTime=Math.max(0,Math.min(1,(evt.clientX-r.left)/r.width))*a.duration;}
+function fmt(s){if(!s||isNaN(s))return'0:00';return`${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`;}
+function markChipFile(k){const n=parseInt(k.replace(/^d(\d+).*/,'$1'));const c=document.getElementById('chip'+n);if(c)c.classList.add('has-file');}
+function toggleGPS(){gpsOn?stopGPS():startGPS();}
+function startGPS(){if(!navigator.geolocation){setPill('err','Not supported');return;}setPill('','Requesting…');gpsWid=navigator.geolocation.watchPosition(p=>{uLat=p.coords.latitude;uLng=p.coords.longitude;setPill('on','±'+Math.round(p.coords.accuracy)+'m');checkTriggers();},()=>setPill('err','GPS error'),{enableHighAccuracy:true,maximumAge:15000,timeout:30000});gpsOn=true;}
+function stopGPS(){if(gpsWid!==null){navigator.geolocation.clearWatch(gpsWid);gpsWid=null;}gpsOn=false;uLat=uLng=null;setPill('','GPS off');}
+function setPill(cls,txt){const p=document.getElementById('gpsPill');p.className='gps-pill'+(cls?' '+cls:'');document.getElementById('gpsLbl').textContent=txt;}
+function haversine(a,b,c,dd){const R=6371000,dL=(c-a)*Math.PI/180,dN=(dd-b)*Math.PI/180;const x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+function checkTriggers(){if(uLat===null)return;const d=DAYS.find(x=>x.day===curDay);if(!d)return;(d.places||[]).forEach((p,i)=>{if(!p.gps)return;const dist=haversine(uLat,uLng,p.gps.lat,p.gps.lng),k=`d${curDay}p${i}`,now=Date.now();if(dist<=p.gps.r&&(!trigLog[k]||now-trigLog[k]>300000)){trigLog[k]=now;autoPlay(k,p.name);}});}
+function autoPlay(k,name){const a=audioEls[k];if(!a||!a.src)return;a.currentTime=0;a.play().catch(()=>{});const b=document.getElementById('pb'+k);if(b){b.textContent='⏸';b.classList.add('playing');}const sec=document.getElementById('ap'+k);if(sec)sec.scrollIntoView({behavior:'smooth',block:'center'});if(Notification.permission==='granted')new Notification('📍 Audio Guide',{body:'Now playing: '+name});}
+function openSheet(day){modalDay=day;document.getElementById('sheetEyebrow').textContent=`Day ${day} · ${DAYS.find(x=>x.day===day)?.date||''}`;selType='audio';document.querySelectorAll('.tile').forEach(t=>t.classList.toggle('sel',t.dataset.t==='audio'));document.getElementById('audioHint').classList.add('show');clearLink();clearLinked();pendingFile=null;document.getElementById('noteInp').value='';document.getElementById('overlay').classList.add('open');}
+function overlayClick(e){if(e.target===document.getElementById('overlay'))closeSheet();}
+function closeSheet(){document.getElementById('overlay').classList.remove('open');}
+function selTile(el){document.querySelectorAll('.tile').forEach(t=>t.classList.remove('sel'));el.classList.add('sel');selType=el.dataset.t;document.getElementById('audioHint').classList.toggle('show',selType==='audio');}
+function clearLink(){document.getElementById('linkInp').value='';document.getElementById('linkX').classList.remove('show');}
+function onLinkType(){document.getElementById('linkX').classList.toggle('show',document.getElementById('linkInp').value.length>0);}
+function clearLinked(){document.getElementById('linkedPreview').classList.remove('show');document.getElementById('linkArea').style.display='';pendingFile=null;}
+function onFilePick(evt){const f=evt.target.files[0];if(!f)return;pendingFile={name:f.name,icon:fIcon(f.name),blob:f};document.getElementById('lpIcon').textContent=pendingFile.icon;document.getElementById('lpName').textContent=f.name;document.getElementById('lpPath').textContent='Local file — '+f.name;document.getElementById('linkedPreview').classList.add('show');document.getElementById('linkArea').style.display='none';}
+async function saveItem(){const note=document.getElementById('noteInp').value.trim();const linkVal=document.getElementById('linkInp').value.trim();const fileRef=pendingFile?pendingFile.name:linkVal||null;const item={type:selType,name:selType,note,fileRef};if(pendingFile?.blob&&selType==='audio'){const blob=new Blob([await pendingFile.blob.arrayBuffer()],{type:pendingFile.blob.type});const xi=S.extra(modalDay).length;const ak=`d${modalDay}x${xi}`;await saveBlob(ak,blob);S.setAudioMeta(ak,{name:pendingFile.name,type:pendingFile.blob.type});}S.addExtra(modalDay,item);closeSheet();await renderDay(modalDay);}
+function buildOverview(){const v=document.getElementById('viewOverview');const gr=DAYS.filter(d=>d.country==='greece').length,eg=DAYS.filter(d=>d.country==='egypt').length;let h=`<div class="ov-hero"><div class="ov-title"><em>Greece</em> &amp; Egypt</div><div class="ov-sub">May 1 – 17, 2026 · Toronto to Toronto</div></div><div class="stats"><div class="stat"><span class="stat-n">17</span><span class="stat-l">Days</span></div><div class="stat"><span class="stat-n">${gr}</span><span class="stat-l">🇬🇷 Greece</span></div><div class="stat"><span class="stat-n">${eg}</span><span class="stat-l">🇪🇬 Egypt</span></div><div class="stat"><span class="stat-n">6</span><span class="stat-l">Flights</span></div><div class="stat"><span class="stat-n">€9,076</span><span class="stat-l">Total</span></div></div><div class="ov-list">`;DAYS.forEach(d=>{h+=`<div class="ov-item ${d.country}" onclick="selectDay(${d.day})"><div class="ov-day">${d.day}</div><div class="ov-info"><div class="ov-t">${d.title}</div><div class="ov-s">${d.date} · ${d.subtitle}</div></div><div class="ov-flag">${d.flag}</div></div>`;});h+=`</div>`;v.innerHTML=h;}
+function buildPacking(){const v=document.getElementById('viewPacking');const p=S.pack();let h=`<div class="pack-wrap"><div class="pack-title">Packing <em>List</em></div></div>`;Object.entries(PACKING).forEach(([sec,items])=>{h+=`<div class="pack-sec">${sec}</div>`;items.forEach(item=>{const key=sec+'|'+item,done=p[key]||false;h+=`<div class="pack-row${done?' done':''}" onclick="togglePackRow(this,'${key.replace(/'/g,"\\'")}')"><div class="pack-check${done?' done':''}">${done?'✓':''}</div><span class="pack-text">${item}</span></div>`;});});v.innerHTML=h;}
+function togglePackRow(row,key){const done=S.togglePack(key);row.classList.toggle('done',done);const c=row.querySelector('.pack-check');c.classList.toggle('done',done);c.textContent=done?'✓':'';}
+function buildInfo(){document.getElementById('viewInfo').innerHTML=`<div class="info-wrap"><div class="info-title">Trip <em>Essentials</em></div></div><div class="sec" style="margin-top:14px">All Bookings</div><div style="padding:0 12px"><div class="info-block"><div class="info-block-title">✈️ Flights</div><div class="info-block-body"><strong>May 1</strong> Toronto→Athens: AC896 · <strong>BLM969</strong> · Dep 18:35 T1 Pearson<br><strong>May 5</strong> Athens→Santorini: A3354 · <strong>78WFFA</strong> · 10:05→10:55<br><strong>May 9</strong> Santorini→Athens: A3357 · <strong>7RGU22</strong> · 12:30→13:20<br><strong>May 9</strong> Athens→Cairo: A3934 · <strong>7RGU22</strong> · 17:05→19:05<br><strong>May 12</strong> Cairo→Luxor: MS274 · <strong>XLSFIV</strong> · 13:40→14:45<br><strong>May 14</strong> Luxor→Cairo: MS61 · <strong>YLFVAQ</strong> · 06:30→07:40<br><strong>May 14</strong> Cairo→Athens: MS747 · <strong>YLFVAQ</strong> · 10:10→12:10<br><strong>May 17</strong> Athens→Toronto: AC921 · <strong>BLM969</strong> · Dep 15:25</div></div><div class="info-block"><div class="info-block-title">🏨 Accommodations</div><div class="info-block-body"><strong>Athens Airbnb</strong> May 2–5 · Ref <strong>HMTHMSDYQ3</strong> · €910<br>Garivaldi St 3 · Check-in 15:00 · Check-out 12:00<br><br><strong>Santorini Airbnb (Oia)</strong> May 5–9 · Ref <strong>HMSAF8B2DH</strong> · €1,290<br>Oia · Check-in 13:00 · Check-out 12:00<br><br><strong>Ramses Hilton, Cairo</strong> May 9–12 · Ref <strong>3427091559</strong> · €850<br>1115 Nile Corniche · Check-in 15:00 · Check-out 12:00<br><br><strong>Steigenberger Nile Palace, Luxor</strong> May 12–14 · Ref <strong>72071424803190</strong> · €432<br>Khaled Ben El-Waleed St · Check-in 15:00 · Check-out 12:00<br><br><strong>Koropi Home</strong> May 14–15 · Ref <strong>HMW4NAPMZZ</strong> · €118<br>Leoforos Vasileos Konstantinou 92 · Check-in 14:00 · Check-out 11:00<br><br><strong>Meteora Airbnb</strong> May 15–16 · Ref <strong>HMFTD23DHF</strong> · Free<br>Rammidi 22 Kalampaka · Check-in 14:00 · Check-out 11:00<br><br><strong>Kallisti Stay, Spata</strong> May 16–17 · Ref <strong>73403342462436</strong> · Free<br>25is Martiou 14, Spata-Artemida · Check-in 14:00 · Check-out 11:00</div></div><div class="info-block"><div class="info-block-title">🚗 Transport & Tickets</div><div class="info-block-body"><strong>Santorini car rental:</strong> Motor Inn #11625 · May 6–7 · €150<br><strong>Cairo airport transfer:</strong> Rimotours · Ref <strong>1764326471</strong> · €36<br><strong>Athens car rental:</strong> Europcar · Ref <strong>1199735672</strong> · May 14–17 · €118<br><strong>Acropolis combo:</strong> Ref <strong>FDEA6BD30C</strong> · €100<br><strong>Ama Lachei reservation:</strong> <strong>ABLZZD</strong> · 12:30 May 4<br><strong>NMEC Cairo:</strong> Ref <strong>EUCAP50C</strong> · €50<br><strong>Luxor West Bank tour:</strong> DTL006<br><strong>Luxor Felucca + Karnak:</strong> DTL025</div></div><div class="info-block"><div class="info-block-title">💱 Money</div><div class="info-block-body"><strong>Greece:</strong> Euro (€). Cards widely accepted.<br><strong>Egypt:</strong> Egyptian Pound (EGP). Carry cash. USD accepted at tourist sites. Keep small bills for baksheesh.</div></div><div class="info-block"><div class="info-block-title">🆘 Emergency Contacts</div><div class="info-block-body"><strong>Greece:</strong> Police 100 · Ambulance 166 · Fire 199<br><strong>Egypt:</strong> Police 122 · Ambulance 123 · Tourist Police 126<br><strong>Canada consular:</strong> +1-613-996-8885</div></div><div class="info-block"><div class="info-block-title">⏰ Time Zones & Power</div><div class="info-block-body"><strong>Greece:</strong> EEST (UTC+3) — 6 hrs ahead of Toronto<br><strong>Egypt:</strong> EET (UTC+2) — 5 hrs ahead of Toronto<br><strong>Power:</strong> 220–230V, Type C/F plug. Universal adapter needed.</div></div><div class="info-block"><div class="info-block-title">👗 Dress Code</div><div class="info-block-body"><strong>Greek monasteries:</strong> No shorts, cover shoulders.<br><strong>Egypt temples/mosques:</strong> Cover shoulders, arms, legs. Women: head scarf for mosques.<br><strong>Egypt water:</strong> Bottled only. ORS sachets for heat.</div></div></div>`;}
+function switchTab(tab){curTab=tab;['day','overview','packing','info'].forEach(t=>{document.getElementById('view'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active',t===tab);document.getElementById('nav-'+t).classList.toggle('active',t===tab);});document.getElementById('stripWrap').style.display=tab==='day'?'':'none';document.getElementById('mainScroll').scrollTop=0;}
+function goToday(){const d=Math.floor((new Date()-new Date('2026-05-01'))/86400000)+1;selectDay(d>=1&&d<=17?d:1);}
+init();
+</script>
+</body>
+</html>
