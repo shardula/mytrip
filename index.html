@@ -182,7 +182,9 @@ body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);disp
 .ni{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:var(--muted);cursor:pointer;padding:3px 0;font-family:'Outfit',sans-serif;transition:color 0.15s;}
 .ni.active{color:var(--gold);}
 .ni-icon{font-size:20px;}.ni-lbl{font-size:10px;letter-spacing:0.04em;}
-input[type="file"]{display:none!important;}
+/* iOS Safari/PWA can fail to open the picker when the input is display:none.
+   Use a visually-hidden technique instead so <label for="..."> works reliably. */
+input[type="file"]{position:absolute!important;left:-9999px!important;width:1px!important;height:1px!important;opacity:0!important;}
 
 .fv-overlay{position:fixed;inset:0;background:#000;z-index:300;display:none;flex-direction:column;}
 .fv-overlay.open{display:flex;}
@@ -202,6 +204,13 @@ input[type="file"]{display:none!important;}
 .fv-topbar-title{font-size:13px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:10px;}
 .fv-close{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.12);border:none;color:var(--text);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:300;line-height:1;}
 .fv-spacer{height:54px;flex-shrink:0;}
+
+/* Small inline controls for added items (reorder + delete) */
+.mini-actions{display:flex;gap:6px;align-items:center;flex-shrink:0;}
+.mini-btn{width:30px;height:30px;border-radius:10px;background:rgba(255,255,255,0.06);border:1px solid var(--border2);color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.mini-btn:active{opacity:0.7;}
+.mini-btn.danger{border-color:rgba(224,82,82,0.35);color:var(--red);background:rgba(224,82,82,0.10);}
+.mini-btn.disabled{opacity:0.35;pointer-events:none;}
 </style>
 </head>
 <body>
@@ -311,6 +320,29 @@ const S={
   setAudioMeta:function(k,m){S.set('am'+k,m);}
 };
 
+// Manage user-added items (reorder + delete)
+function deleteExtra(day,idx){
+  try{
+    var a=S.extra(day);
+    if(!a||idx<0||idx>=a.length) return;
+    if(!confirm('Delete this item?')) return;
+    a.splice(idx,1);
+    S.set('x'+day,a);
+    renderDay(day);
+  }catch(e){console.error(e);}
+}
+function moveExtra(day,idx,dir){
+  try{
+    var a=S.extra(day);
+    if(!a||idx<0||idx>=a.length) return;
+    var j=idx+dir;
+    if(j<0||j>=a.length) return;
+    var tmp=a[idx]; a[idx]=a[j]; a[j]=tmp;
+    S.set('x'+day,a);
+    renderDay(day);
+  }catch(e){console.error(e);}
+}
+
 /* ═══════════ INDEXEDDB ═══════════ */
 function openDB(){
   return new Promise(function(res,rej){
@@ -402,7 +434,7 @@ function mkAudioBlock(key){
     +'</div></div>'
     +'<div class="attach-strip" id="aus'+key+'">'
     +'<label class="attach-chip" for="af'+key+'">🎧 Link audio file</label>'
-    +'<input type="file" id="af'+key+'" accept="audio/*" onchange="handleAudio(event,\''+key+'\')">'
+    +'<input type="file" id="af'+key+'" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg" onchange="handleAudio(event,\''+key+'\')">'
     +'</div>';
 }
 function mkFileChip(storedKey,fileRef){
@@ -517,7 +549,16 @@ async function renderDay(n){
       var ak2='d'+n+'x'+xi;
       var xIcon=typeIcons[item.type]||'📌';
       h+='<div class="card place" style="border-color:var(--gold-border)">';
-      h+='<div class="card-title">'+xIcon+' '+(item.name||item.type||'Item')+'</div>';
+      var upCls = (xi===0)?'mini-btn disabled':'mini-btn';
+      var dnCls = (xi===extra.length-1)?'mini-btn disabled':'mini-btn';
+      h+='<div class="card-row">'
+        +'<div class="card-title" style="margin:0;flex:1">'+xIcon+' '+(item.name||item.type||'Item')+'</div>'
+        +'<div class="mini-actions">'
+          +'<button class="'+upCls+'" title="Move up" onclick="moveExtra('+n+','+xi+',-1)">↑</button>'
+          +'<button class="'+dnCls+'" title="Move down" onclick="moveExtra('+n+','+xi+',1)">↓</button>'
+          +'<button class="mini-btn danger" title="Delete" onclick="deleteExtra('+n+','+xi+')">🗑</button>'
+        +'</div>'
+      +'</div>';
       if(item.note) h+='<div class="card-detail">'+item.note+'</div>';
       if(item.type==='audio'){
         h+='<div id="audiowrap'+ak2+'">'+mkAudioBlock(ak2)+'</div>';
@@ -572,12 +613,29 @@ async function renderDay(n){
 async function handleAudio(evt,k){
   var f=evt.target.files[0];
   if(!f) return;
-  var ab=await f.arrayBuffer();
-  var blob=new Blob([ab],{type:f.type});
-  await saveBlob(k,blob);
-  S.setAudioMeta(k,{name:f.name,type:f.type});
-  showPlayer(k,URL.createObjectURL(blob),f.name);
-  markChipFile(k);
+  // iOS PWA storage quotas can be tight. Give a friendly message if the file is very large.
+  // (Most "good" guides are 2–20MB; very long recordings can be 50MB+.)
+  var mb=(f.size||0)/1024/1024;
+  if(mb>80){
+    if(!confirm('This audio file is ~'+mb.toFixed(0)+'MB. iPhone offline storage may fail for very large files. Continue?')){
+      evt.target.value='';
+      return;
+    }
+  }
+  try{
+    var ab=await f.arrayBuffer();
+    var blob=new Blob([ab],{type:f.type||'audio/mpeg'});
+    await saveBlob(k,blob);
+    S.setAudioMeta(k,{name:f.name,type:f.type||'audio/mpeg'});
+    showPlayer(k,URL.createObjectURL(blob),f.name);
+    markChipFile(k);
+  }catch(e){
+    console.error(e);
+    alert('Could not save this audio file for offline use. Try a smaller MP3/M4A file, or shorten/compress it.');
+  } finally {
+    // Allow re-uploading the same file again.
+    evt.target.value='';
+  }
 }
 async function restoreAudio(k,fallback){
   var blob=await loadBlob(k);
