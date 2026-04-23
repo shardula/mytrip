@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- Allow pinch-zoom (needed for readable PDFs on iOS). -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MyTrip">
@@ -185,7 +186,11 @@ input[type="file"]{display:none!important;}
 .fv-overlay{position:fixed;inset:0;background:#000;z-index:300;display:none;flex-direction:column;}
 .fv-overlay.open{display:flex;}
 .fv-body{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;width:100%;position:relative;}
-.fv-body embed{width:100%;height:100%;min-height:calc(100vh - 54px);border:none;display:block;}
+.fv-body iframe{width:100%;height:100%;min-height:calc(100vh - 54px);border:none;display:block;background:#000;}
+.fv-controls{display:flex;align-items:center;gap:8px;margin-right:10px;}
+.fv-btn{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.16);color:var(--text);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.fv-btn:active{opacity:0.7;}
+.fv-btn.small{width:30px;height:30px;border-radius:9px;font-size:14px;}
 .fv-body img{max-width:100%;height:auto;display:block;margin:auto;padding:12px;}
 .fv-other{padding:40px 24px;text-align:center;color:var(--muted);}
 .fv-other .fv-icon{font-size:52px;margin-bottom:14px;}
@@ -645,18 +650,33 @@ async function openFileViewer(fkey,fname){
   var isImg=mime.startsWith('image/');
 
   if(isPDF){
-    // Convert to base64 data URL — only way to get scrollable PDF on iOS Safari
-    var reader=new FileReader();
-    reader.onload=function(e){
-      var dataUrl=e.target.result;
+    // Use a Blob URL + iframe for better iOS behavior (full page list + pinch zoom)
+    // and to avoid data: URL size/partial-render issues.
+    try{
+      var urlPdf=URL.createObjectURL(rec.blob);
+      body.dataset.objUrl=urlPdf;
       body.innerHTML='';
-      var embed=document.createElement('embed');
-      embed.src=dataUrl;
-      embed.type='application/pdf';
-      embed.style.cssText='width:100%;height:100%;min-height:calc(100vh - 54px);border:none;display:block;';
-      body.appendChild(embed);
-    };
-    reader.readAsDataURL(rec.blob);
+      var iframe=document.createElement('iframe');
+      iframe.src=urlPdf;
+      iframe.setAttribute('title', title);
+      iframe.setAttribute('loading','eager');
+      iframe.style.cssText='width:100%;height:100%;min-height:calc(100vh - 54px);border:none;display:block;background:#000;';
+      body.appendChild(iframe);
+
+      // Zoom controls (CSS scale). Pinch-zoom also works because viewport allows scaling.
+      window.__pdfZoom = window.__pdfZoom || 1;
+      function applyZoom(){
+        var z=window.__pdfZoom;
+        iframe.style.transform='scale('+z+')';
+        iframe.style.transformOrigin='0 0';
+        iframe.style.width=(100/z)+'%';
+        iframe.style.height=(100/z)+'%';
+      }
+      window.__applyPdfZoom = applyZoom;
+      applyZoom();
+    }catch(e){
+      body.innerHTML='<div class="fv-other"><div class="fv-icon">📄</div><p>Unable to render this PDF in-app. Tap below to download and open.</p></div>';
+    }
   } else if(isImg){
     var url=URL.createObjectURL(rec.blob);
     body.innerHTML='';
@@ -671,6 +691,8 @@ async function openFileViewer(fkey,fname){
 }
 function closeViewer(){
   var b=document.getElementById('fvBody');
+  // Revoke any object URLs we created
+  try{ if(b.dataset.objUrl){ URL.revokeObjectURL(b.dataset.objUrl); delete b.dataset.objUrl; } }catch(e){}
   var imgs=b.querySelectorAll('img');
   for(var i=0;i<imgs.length;i++){try{URL.revokeObjectURL(imgs[i].src);}catch(e){}}
   var as=b.querySelectorAll('a[download]');
@@ -678,6 +700,31 @@ function closeViewer(){
   b.innerHTML='';
   document.getElementById('fvOverlay').classList.remove('open');
 }
+
+// File viewer controls (zoom + close helpers)
+(function initFileViewerControls(){
+  function bind(){
+    function byId(id){return document.getElementById(id);}
+    var zin=byId('fvZoomIn'), zout=byId('fvZoomOut'), zrst=byId('fvZoomReset'), ext=byId('fvOpenExternal');
+    if(zin) zin.onclick=function(){window.__pdfZoom=Math.min(3,(window.__pdfZoom||1)+0.25); if(window.__applyPdfZoom) window.__applyPdfZoom();};
+    if(zout) zout.onclick=function(){window.__pdfZoom=Math.max(0.75,(window.__pdfZoom||1)-0.25); if(window.__applyPdfZoom) window.__applyPdfZoom();};
+    if(zrst) zrst.onclick=function(){window.__pdfZoom=1; if(window.__applyPdfZoom) window.__applyPdfZoom();};
+    if(ext) ext.onclick=function(){
+      var b=byId('fvBody');
+      var u=b&&b.dataset&&b.dataset.objUrl?b.dataset.objUrl:null;
+      if(!u){ var ifr=b?b.querySelector('iframe'):null; u=ifr?ifr.src:null; }
+      if(u) window.open(u,'_blank');
+    };
+    document.addEventListener('keydown',function(e){
+      var ov=byId('fvOverlay');
+      if(e.key==='Escape' && ov && ov.classList.contains('open')) closeViewer();
+    });
+    var ov=byId('fvOverlay');
+    if(ov) ov.addEventListener('click',function(e){ if(e.target===ov) closeViewer(); });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', bind);
+  else bind();
+})();
 
 /* ═══════════ GPS ═══════════ */
 function toggleGPS(){if(gpsOn)stopGPS();else startGPS();}
@@ -903,6 +950,12 @@ init();
 <div class="fv-overlay" id="fvOverlay">
   <div class="fv-topbar" id="fvTopbar">
     <div class="fv-topbar-title" id="fvTitle">File</div>
+    <div class="fv-controls">
+      <button class="fv-btn small" id="fvZoomOut" title="Zoom out">−</button>
+      <button class="fv-btn small" id="fvZoomIn" title="Zoom in">+</button>
+      <button class="fv-btn small" id="fvZoomReset" title="Reset zoom">⤾</button>
+      <button class="fv-btn small" id="fvOpenExternal" title="Open in full viewer">↗</button>
+    </div>
     <button class="fv-close" onclick="closeViewer()">&#10005;</button>
   </div>
   <div class="fv-spacer"></div>
