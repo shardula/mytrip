@@ -870,7 +870,8 @@ async function renderDay(n){
   // Restore audio/mark files for extra items
   for(var rxi=0;rxi<(extra||[]).length;rxi++){
     var ritem=extra[rxi];
-    if(ritem.type==='audio') await restoreAudio('d'+n+'x'+rxi, ritem.name||'Audio');
+    // Use storedKey when available so audio continues to work even if items are reordered.
+    if(ritem.type==='audio') await restoreAudio(ritem.storedKey || ('d'+n+'x'+rxi), ritem.name||'Audio');
     else if(ritem.storedKey) markChipFile(ritem.storedKey);
   }
 }
@@ -959,6 +960,25 @@ function fmtTime(s){
 function markChipFile(k){
   var n=parseInt(k.replace(/^d(\d+).*/,'$1'));
   var c=document.getElementById('chip'+n); if(c) c.classList.add('has-file');
+}
+
+// Ensure a global order array exists for a given day. This prevents edge-cases where
+// newly-added items appear but cannot be reordered because the day's order list
+// hasn't been initialized yet.
+function ensureGlobalOrderForDay(day){
+  try{
+    var d=DAYS.find(function(x){return x.day===day;});
+    if(!d) return [];
+    ensureIds(day);
+    var flights=getSectionList(d,'flights')||[];
+    var stays=getSectionList(d,'stays')||[];
+    var places=getSectionList(d,'places')||[];
+    var meals=getSectionList(d,'meals')||[];
+    var extra=S.extra(day)||[];
+    var secOrder=getSecOrder(day);
+    var lists={flights:flights,stays:stays,places:places,meals:meals,extra:extra};
+    return getGlobalOrder(d, secOrder, lists);
+  }catch(e){ console.error(e); return (S.get(orderKey(day))||[]); }
 }
 
 /* ═══════════ FILE VIEWER ═══════════ */
@@ -1140,16 +1160,17 @@ async function saveItem(){
     storedKey=fkey;
   }
   S.addExtra(modalDay,{type:selType,name:selType,note:note,fileRef:fileRef,storedKey:storedKey});
-  // Append new item into global order so it can be moved anywhere
+  // Ensure the day has a valid global order and that the new item is included.
+  // (iOS PWAs can sometimes create day state before the order list is initialized.)
   try{
     var a=S.extra(modalDay)||[];
     var last=a[a.length-1];
     if(last && last._id){
-      var ok=orderKey(modalDay);
-      var o=S.get(ok);
-      if(o && Array.isArray(o)){ o.push('extra:'+last._id); S.set(ok,o); }
+      var o=ensureGlobalOrderForDay(modalDay);
+      var k='extra:'+last._id;
+      if(o.indexOf(k)===-1){ o.push(k); S.set(orderKey(modalDay), o); }
     }
-  }catch(e){}
+  }catch(e){ console.error(e); }
   closeSheet();
   await renderDay(modalDay);
 }
