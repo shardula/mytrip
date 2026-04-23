@@ -302,6 +302,86 @@ const DAYS=[
 
 const PACKING={'Documents & Finance':['Passport (valid 6+ months)','Travel insurance printed','AC896 ref BLM969 (Toronto→Athens)','Aegean 78WFFA (Athens→Santorini)','Aegean 7RGU22 (Santorini→Cairo)','EgyptAir XLSFIV (Cairo→Luxor)','EgyptAir YLFVAQ (Luxor→Athens)','AC921 ref BLM969 (Athens→Toronto)','Europcar 1199735672','Athens Airbnb HMTHMSDYQ3','Santorini Airbnb HMSAF8B2DH','Ramses Hilton 3427091559','Steigenberger Luxor 72071424803190','Koropi HMW4NAPMZZ','Meteora HMFTD23DHF','Kallisti Stay 73403342462436','Rimotours 1764326471','Euros (cash)','Egyptian Pounds (EGP)','USD for Egypt tips'],'Clothing — Greece':['Light summer clothes (4–5 days)','Swimwear (2 sets)','Modest layer for monasteries','Comfortable walking shoes','Evening outfit','Light jacket for evenings'],'Clothing — Egypt':['Modest tops (shoulders covered)','Long trousers/skirts for temples','Sun hat (essential!)','Light scarf/shawl','Sandals / flat shoes'],'Health & Toiletries':['SPF 50+ sunscreen (lots!)','After-sun lotion','Insect repellent',"Traveller's diarrhoea meds",'Pain/fever medication','Antihistamines','Prescription medications','ORS sachets (Egypt heat)'],'Tech & Gear':['Phone + charger','Universal travel adapter (EU/EG)','Portable power bank','Earphones/AirPods (audio guides!)','Camera + memory cards','Waterproof phone pouch'],'Misc':['Small backpack / day bag','Reusable water bottle','Earplugs + eye mask','Snacks for travel days','Small bills for tips']};
 
+
+/* ═══════════ BASE ITEM IDS + OVERRIDES ═══════════ */
+// Give every built-in item a stable id so audio/files stay attached even after reordering.
+(function initBaseIds(){
+  for(var di=0; di<DAYS.length; di++){
+    var d=DAYS[di];
+    var day=d.day;
+    (d.flights||[]).forEach(function(it,i){ if(!it._id) it._id='f'+day+'_'+i; });
+    (d.stays||[]).forEach(function(it,i){ if(!it._id) it._id='s'+day+'_'+i; });
+    (d.places||[]).forEach(function(it,i){ if(!it._id) it._id='p'+day+'_'+i; });
+    (d.meals||[]).forEach(function(it,i){ if(!it._id) it._id='m'+day+'_'+i; });
+  }
+})();
+
+// Base overrides are stored per-day + section (flights/stays/places/meals).
+// We clone the built-in array the first time you edit/reorder/delete.
+function ovKey(day,sec){ return 'ov_'+sec+'_'+day; }
+function getBaseSection(dayObj,sec){
+  if(sec==='flights') return dayObj.flights||[];
+  if(sec==='stays') return dayObj.stays||[];
+  if(sec==='places') return dayObj.places||[];
+  if(sec==='meals') return dayObj.meals||[];
+  return [];
+}
+function getSectionList(dayObj,sec){
+  var day=dayObj.day;
+  var ov=S.get(ovKey(day,sec));
+  if(ov && Array.isArray(ov)) return ov;
+  return getBaseSection(dayObj,sec);
+}
+function ensureOverride(dayObj,sec){
+  var day=dayObj.day;
+  var ov=S.get(ovKey(day,sec));
+  if(ov && Array.isArray(ov)) return ov;
+  // deep clone to avoid mutating DAYS constant
+  var base=getBaseSection(dayObj,sec);
+  var clone=JSON.parse(JSON.stringify(base));
+  S.set(ovKey(day,sec), clone);
+  return clone;
+}
+function moveBase(day,sec,idx,dir){
+  var d=DAYS.find(function(x){return x.day===day;});
+  if(!d) return;
+  var a=ensureOverride(d,sec);
+  var j=idx+dir;
+  if(j<0||j>=a.length) return;
+  var tmp=a[idx]; a[idx]=a[j]; a[j]=tmp;
+  S.set(ovKey(day,sec), a);
+  renderDay(day);
+}
+function deleteBase(day,sec,idx){
+  var d=DAYS.find(function(x){return x.day===day;});
+  if(!d) return;
+  var a=ensureOverride(d,sec);
+  if(idx<0||idx>=a.length) return;
+  if(!confirm('Delete this item?')) return;
+  a.splice(idx,1);
+  S.set(ovKey(day,sec), a);
+  renderDay(day);
+}
+function editBase(day,sec,idx){
+  var d=DAYS.find(function(x){return x.day===day;});
+  if(!d) return;
+  var a=ensureOverride(d,sec);
+  if(idx<0||idx>=a.length) return;
+  var it=a[idx]||{};
+  var newTitle = prompt('Update title/name:', it.name || it.title || it.airline || '');
+  if(newTitle===null) return;
+  // store into the most relevant field for that section
+  if(sec==='meals' || sec==='places' || sec==='stays'){ it.name=newTitle; }
+  else if(sec==='flights'){ it.airline=newTitle || it.airline; }
+  // allow a user note on any item
+  var newNote = prompt('Update note/details (optional):', it.userNote || it.note || it.tips || '');
+  if(newNote===null) newNote = it.userNote || '';
+  it.userNote = newNote;
+  a[idx]=it;
+  S.set(ovKey(day,sec), a);
+  renderDay(day);
+}
+
 /* ═══════════ STATE ═══════════ */
 let curDay=1,curTab='day',gpsOn=false,gpsWid=null,uLat=null,uLng=null,modalDay=null,selType='audio',pendingFile=null;
 const audioEls={},trigLog={};
@@ -472,12 +552,21 @@ async function renderDay(n){
   h+='</div></div>';
 
   // FLIGHTS
-  if(d.flights&&d.flights.length){
+  var flights=getSectionList(d,'flights');
+  if(flights&&flights.length){
     h+='<div class="sec">✈️ Flights</div><div class="cards">';
-    for(var fi=0;fi<d.flights.length;fi++){
-      var f=d.flights[fi];
+    for(var fi=0;fi<flights.length;fi++){
+      var f=flights[fi];
       h+='<div class="card flight">';
+      var upClsF=(fi===0)?'mini-btn disabled':'mini-btn';
+      var dnClsF=(fi===flights.length-1)?'mini-btn disabled':'mini-btn';
       h+='<div class="card-row"><div class="card-sub">'+f.airline+(f.flightNo?' · '+f.flightNo:'')+'</div>';
+      h+='<div class="mini-actions">'
+          +'<button class="'+upClsF+'" title="Move up" onclick="moveBase('+n+',\'flights\','+fi+',-1)">↑</button>'
+          +'<button class="'+dnClsF+'" title="Move down" onclick="moveBase('+n+',\'flights\','+fi+',1)">↓</button>'
+          +'<button class="mini-btn" title="Edit" onclick="editBase('+n+',\'flights\','+fi+')">✎</button>'
+          +'<button class="mini-btn danger" title="Delete" onclick="deleteBase('+n+',\'flights\','+fi+')">🗑</button>'
+        +'</div>';
       if(f.price) h+='<span style="font-size:11px;color:var(--muted)">'+f.price+'</span>';
       h+='</div>';
       h+='<div class="f-route"><div class="f-city"><div class="f-code">'+f.from+'</div><div class="f-name">'+f.fromCity+'</div></div>';
@@ -485,6 +574,7 @@ async function renderDay(n){
       h+='<div class="f-city"><div class="f-code">'+f.to+'</div><div class="f-name">'+f.toCity+'</div></div></div>';
       h+='<div class="f-meta"><span>🛫 '+f.departs+'</span><span>⏱ '+f.duration+'</span><span>🛬 '+f.arrives+'</span></div>';
       if(f.terminal) h+='<div class="card-detail" style="margin-top:6px">🏢 '+f.terminal+'</div>';
+      if(f.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+f.userNote+'</div>';
       h+=mkBkRow(f.ref,f.mapQ||null);
       h+='</div>';
     }
@@ -492,35 +582,58 @@ async function renderDay(n){
   }
 
   // STAYS
-  if(d.stays&&d.stays.length){
+  var stays=getSectionList(d,'stays');
+  if(stays&&stays.length){
     h+='<div class="sec">🏨 Accommodation</div><div class="cards">';
-    for(var si=0;si<d.stays.length;si++){
-      var s=d.stays[si];
+    for(var si=0;si<stays.length;si++){
+      var s=stays[si];
       var sIcon={hotel:'🏨',airbnb:'🏠',car:'🚗',cab:'🚕'}[s.type]||'🏨';
       var sClass={hotel:'hotel',airbnb:'airbnb',car:'car',cab:'car'}[s.type]||'hotel';
       h+='<div class="card '+sClass+'">';
+      var upClsS=(si===0)?'mini-btn disabled':'mini-btn';
+      var dnClsS=(si===stays.length-1)?'mini-btn disabled':'mini-btn';
       h+='<div class="card-row"><span style="font-size:14px">'+sIcon+'</span><span class="card-title" style="flex:1;margin-left:6px">'+s.name+'</span>';
+      h+='<div class="mini-actions">'
+          +'<button class="'+upClsS+'" title="Move up" onclick="moveBase('+n+',\'stays\','+si+',-1)">↑</button>'
+          +'<button class="'+dnClsS+'" title="Move down" onclick="moveBase('+n+',\'stays\','+si+',1)">↓</button>'
+          +'<button class="mini-btn" title="Edit" onclick="editBase('+n+',\'stays\','+si+')">✎</button>'
+          +'<button class="mini-btn danger" title="Delete" onclick="deleteBase('+n+',\'stays\','+si+')">🗑</button>'
+        +'</div>';
       if(s.price&&s.price!=='Free') h+='<span style="font-size:11px;color:var(--muted)">'+s.price+'</span>';
       h+='</div>';
       if(s.address) h+='<div class="addr-row"><span class="addr-icon">📍</span><span class="addr-text">'+s.address+'</span></div>';
       h+=mkCiRow(s.checkIn,s.checkOut);
       h+=mkBkRow(s.ref,s.mapQ||null);
       if(s.note) h+='<div class="card-detail">'+s.note+'</div>';
+      if(s.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+s.userNote+'</div>';
       h+='</div>';
     }
     h+='</div>';
   }
 
   // PLACES
-  if(d.places&&d.places.length){
+  var places=getSectionList(d,'places');
+  if(places&&places.length){
     h+='<div class="sec">📍 Attractions</div>';
-    for(var pi=0;pi<d.places.length;pi++){
-      var p=d.places[pi];
-      var ak='d'+n+'p'+pi;
+    for(var pi=0;pi<places.length;pi++){
+      var p=places[pi];
+      var pid=(p._id||('p'+n+'_'+pi));
+      var ak='d'+n+'_'+pid;
       h+='<div class="cards"><div class="card place">';
-      h+='<div class="card-title">'+p.name+'</div>';
+      var upClsP=(pi===0)?'mini-btn disabled':'mini-btn';
+      var dnClsP=(pi===places.length-1)?'mini-btn disabled':'mini-btn';
+      h+='<div class="card-row">'
+        +'<div class="card-title" style="margin:0;flex:1">'+p.name+'</div>'
+        +'<div class="mini-actions">'
+          +'<button class="'+upClsP+'" title="Move up" onclick="moveBase('+n+',\'places\','+pi+',-1)">↑</button>'
+          +'<button class="'+dnClsP+'" title="Move down" onclick="moveBase('+n+',\'places\','+pi+',1)">↓</button>'
+          +'<button class="mini-btn" title="Edit" onclick="editBase('+n+',\'places\','+pi+')">✎</button>'
+          +'<button class="mini-btn danger" title="Delete" onclick="deleteBase('+n+',\'places\','+pi+')">🗑</button>'
+        +'</div>'
+      +'</div>';
       if(p.time) h+='<div class="card-sub">'+p.time+'</div>';
       h+='<div class="card-detail">💡 '+p.tips+'</div>';
+      if(p.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+p.userNote+'</div>';
       if(p.ref) h+=mkBkRow(p.ref,p.mapQ||null);
       if(p.gps) h+='<div style="margin-top:6px;font-size:10px;color:var(--green)">📡 GPS audio trigger active</div>';
       h+='<div id="audiowrap'+ak+'">'+mkAudioBlock(ak)+'</div>';
@@ -529,12 +642,25 @@ async function renderDay(n){
   }
 
   // MEALS
-  if(d.meals&&d.meals.length){
+  var meals=getSectionList(d,'meals');
+  if(meals&&meals.length){
     h+='<div class="sec">🍽 Food &amp; Drink</div><div class="cards">';
-    for(var mi=0;mi<d.meals.length;mi++){
-      var m=d.meals[mi];
-      h+='<div class="card meal"><div class="card-title">'+m.name+'</div>';
+    for(var mi=0;mi<meals.length;mi++){
+      var m=meals[mi];
+      var upClsM=(mi===0)?'mini-btn disabled':'mini-btn';
+      var dnClsM=(mi===meals.length-1)?'mini-btn disabled':'mini-btn';
+      h+='<div class="card meal">'
+        +'<div class="card-row">'
+          +'<div class="card-title" style="margin:0;flex:1">'+m.name+'</div>'
+          +'<div class="mini-actions">'
+            +'<button class="'+upClsM+'" title="Move up" onclick="moveBase('+n+',\'meals\','+mi+',-1)">↑</button>'
+            +'<button class="'+dnClsM+'" title="Move down" onclick="moveBase('+n+',\'meals\','+mi+',1)">↓</button>'
+            +'<button class="mini-btn" title="Edit" onclick="editBase('+n+',\'meals\','+mi+')">✎</button>'
+            +'<button class="mini-btn danger" title="Delete" onclick="deleteBase('+n+',\'meals\','+mi+')">🗑</button>'
+          +'</div>'
+        +'</div>';
       if(m.note) h+='<div class="card-detail">'+m.note+'</div>';
+      if(m.userNote) h+='<div class="card-detail" style="margin-top:6px">📝 '+m.userNote+'</div>';
       h+='</div>';
     }
     h+='</div>';
@@ -594,9 +720,11 @@ async function renderDay(n){
   view.classList.add('fade');
   setTimeout(function(){view.classList.remove('fade');},400);
 
-  // Restore audio for base places
-  for(var rpi=0;rpi<(d.places||[]).length;rpi++){
-    await restoreAudio('d'+n+'p'+rpi, d.places[rpi].name);
+  // Restore audio for base places (use stable ids)
+  for(var rpi=0;rpi<(places||[]).length;rpi++){
+    var rp=places[rpi];
+    var rpid=(rp._id||('p'+n+'_'+rpi));
+    await restoreAudio('d'+n+'_'+rpid, rp.name);
   }
   // Restore audio/mark files for extra items
   for(var rxi=0;rxi<extra.length;rxi++){
